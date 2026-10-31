@@ -19,6 +19,7 @@
 
 // 命令别名 → 规范名
 const ALIASES = {
+  '探活': 'ping', 'ping': 'ping',
   '点击': 'tap', 'tap': 'tap', 'click': 'tap',
   '双击': 'dtap', 'dtap': 'dtap', 'double': 'dtap',
   '长按': 'press', 'press': 'press', 'long': 'press', 'longpress': 'press',
@@ -56,6 +57,9 @@ export function parseScript(text) {
     if (!canonical) throw new Error(`第 ${lineNo} 行: 未知命令 "${cmdWord}"`);
 
     switch (canonical) {
+      case 'ping':
+        steps.push(action('ping', {}, lineNo));
+        break;
       case 'tap':
         if (!args.length) throw new Error(`第 ${lineNo} 行: 点击 需要 identifier 或 x y`);
         if (isNumber(args[0])) {
@@ -157,7 +161,9 @@ export function stepsToDSL(steps) {
         lines.push(`滑动 ${s.fromX} ${s.fromY} ${s.toX} ${s.toY}${id ? `   # ${id}` : ''}`);
         break;
       case 'type_text':
-        lines.push(`输入 ${id} ${s.text}`);
+        // 回放的输入是追加式（insertText），先清空再输入保证终态与录制时一致
+        lines.push(id ? `清空 ${id}` : `# 跳过无标识输入步骤: ${JSON.stringify(s)}`);
+        if (id) lines.push(`输入 ${id} ${s.text}`);
         break;
       case 'clear_text':
         lines.push(`清空 ${id}`);

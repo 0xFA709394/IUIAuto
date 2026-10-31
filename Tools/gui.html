@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IUIAuto 控制台</title>
+<style>
+  :root {
+    --bg: #f4f5f7; --panel: #fff; --border: #e2e4e9; --text: #1c1e21;
+    --muted: #8a8f98; --blue: #0a84ff; --green: #34c759; --red: #ff453a;
+    --mono: 'SF Mono', Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font: 14px/1.5 -apple-system, 'PingFang SC', sans-serif; background: var(--bg); color: var(--text); height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+  header { background: var(--panel); border-bottom: 1px solid var(--border); padding: 10px 16px; display: flex; align-items: center; gap: 14px; flex-shrink: 0; }
+  header h1 { font-size: 16px; font-weight: 700; }
+  header h1 small { color: var(--muted); font-weight: 400; margin-left: 6px; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--red); display: inline-block; margin-right: 5px; }
+  .dot.on { background: var(--green); box-shadow: 0 0 6px var(--green); }
+  #deviceInfo { color: var(--muted); font-size: 12px; flex: 1; }
+  .rec-badge { background: var(--red); color: #fff; border-radius: 4px; padding: 2px 10px; font-size: 12px; font-weight: 700; display: none; animation: blink 1s infinite; }
+  @keyframes blink { 50% { opacity: .45; } }
+
+  main { flex: 1; display: flex; min-height: 0; }
+  .left { width: 360px; background: var(--panel); border-right: 1px solid var(--border); display: flex; flex-direction: column; min-height: 0; }
+  .section-title { font-size: 12px; font-weight: 600; color: var(--muted); padding: 10px 12px 6px; text-transform: uppercase; letter-spacing: .5px; }
+  .shot-wrap { position: relative; margin: 0 12px; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: #000; min-height: 160px; cursor: crosshair; }
+  #shotImg { display: block; width: 100%; }
+  .shot-hint { color: var(--muted); font-size: 11px; padding: 6px 12px; }
+  .shot-toolbar { display: flex; align-items: center; gap: 8px; padding: 6px 12px; }
+  .tree-wrap { flex: 1; overflow: auto; margin: 4px 12px 12px; border: 1px solid var(--border); border-radius: 8px; padding: 6px; font-size: 12px; min-height: 0; }
+  .tree-node { padding: 2px 4px; border-radius: 4px; cursor: pointer; white-space: nowrap; }
+  .tree-node:hover { background: #f0f4ff; }
+  .tree-node .id { color: var(--blue); font-family: var(--mono); font-size: 11px; }
+  .tree-node .cls { color: var(--muted); }
+  .tree-node .txt { color: #9c6b00; }
+  .tree-children { margin-left: 14px; border-left: 1px dashed var(--border); padding-left: 6px; }
+
+  .right { flex: 1; display: flex; flex-direction: column; min-width: 0; background: var(--bg); }
+  nav.tabs { display: flex; background: var(--panel); border-bottom: 1px solid var(--border); flex-shrink: 0; }
+  nav.tabs button { border: none; background: none; padding: 11px 18px; font-size: 14px; color: var(--muted); cursor: pointer; border-bottom: 2px solid transparent; }
+  nav.tabs button.active { color: var(--blue); border-bottom-color: var(--blue); font-weight: 600; }
+  .tab-body { flex: 1; overflow: auto; padding: 16px; min-height: 0; }
+  .tab-pane { display: none; }
+  .tab-pane.active { display: block; }
+
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 14px; margin-bottom: 14px; }
+  .card h3 { font-size: 13px; color: var(--muted); margin-bottom: 10px; }
+  .row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
+  input[type=text], input[type=number], textarea, select {
+    border: 1px solid var(--border); border-radius: 6px; padding: 7px 10px; font-size: 13px; font-family: inherit; background: #fff;
+  }
+  input[type=number] { width: 76px; }
+  textarea { font-family: var(--mono); font-size: 12px; width: 100%; min-height: 260px; padding: 10px; line-height: 1.6; tab-size: 4; }
+  label.inline { color: var(--muted); font-size: 12px; }
+  button.btn { border: none; border-radius: 6px; padding: 7px 14px; font-size: 13px; cursor: pointer; background: #eef1f5; color: var(--text); }
+  button.btn:hover { filter: brightness(.96); }
+  button.btn.primary { background: var(--blue); color: #fff; }
+  button.btn.danger { background: var(--red); color: #fff; }
+  button.btn.success { background: var(--green); color: #fff; }
+  button.btn.small { padding: 3px 9px; font-size: 12px; }
+  .ok-text { color: var(--green); } .err-text { color: var(--red); }
+  table { border-collapse: collapse; width: 100%; font-size: 12.5px; }
+  th, td { border-bottom: 1px solid var(--border); text-align: left; padding: 7px 8px; vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; font-size: 12px; }
+  code { font-family: var(--mono); font-size: 11.5px; background: #f0f2f5; padding: 1px 5px; border-radius: 4px; }
+
+  #toast { position: fixed; top: 60px; right: 20px; z-index: 99; display: flex; flex-direction: column; gap: 8px; }
+  .toast-item { background: #22242a; color: #fff; border-radius: 8px; padding: 10px 16px; font-size: 13px; box-shadow: 0 4px 14px rgba(0,0,0,.25); animation: slide .2s; }
+  .toast-item.ok { border-left: 3px solid var(--green); }
+  .toast-item.err { border-left: 3px solid var(--red); }
+  @keyframes slide { from { transform: translateX(30px); opacity: 0; } }
+
+  .log-view { font-family: var(--mono); font-size: 11.5px; background: #1d1f24; color: #cfd3da; border-radius: 8px; padding: 10px; height: calc(100vh - 160px); overflow: auto; white-space: pre-wrap; }
+  .script-list { width: 220px; float: left; margin-right: 14px; }
+  .script-item { padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; margin-bottom: 6px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
+  .script-item:hover { background: #f6f9ff; }
+  .report-summary { font-size: 16px; font-weight: 700; padding: 10px 0; }
+  .badge { display: inline-block; border-radius: 10px; padding: 1px 9px; font-size: 11px; font-weight: 700; }
+  .badge.pass { background: #e6f9ec; color: var(--green); }
+  .badge.fail { background: #ffeceb; color: var(--red); }
+  .fail-shot { max-width: 100%; border: 2px solid var(--red); border-radius: 8px; margin-top: 10px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>IUIAuto 控制台<small>测试人员工作台</small></h1>
+  <span><span class="dot" id="connDot"></span><span id="connText">未连接</span></span>
+  <span id="deviceInfo"></span>
+  <span class="rec-badge" id="recBadge">● REC</span>
+</header>
+
+<main>
+  <div class="left">
+    <div class="section-title">实时画面（点击即操作）</div>
+    <div class="shot-wrap"><img id="shotImg" alt="等待截图…" title=""></div>
+    <div class="shot-toolbar">
+      <label class="inline"><input type="checkbox" id="autoRefresh"> 自动刷新(3s)</label>
+      <button class="btn small" onclick="refreshShot(1)">刷新</button>
+      <span class="shot-hint" id="shotHint"></span>
+    </div>
+    <div class="section-title">元素树（点击选中）</div>
+    <div class="tree-wrap" id="viewTree"><span style="color:#8a8f98">点击「刷新」加载…</span></div>
+    <div class="row" style="padding: 0 12px 10px">
+      <button class="btn small" onclick="loadTree()">刷新元素树</button>
+      <span id="treeDetail" class="shot-hint"></span>
+    </div>
+  </div>
+
+  <div class="right">
+    <nav class="tabs">
+      <button class="active" data-tab="manual">手动操作</button>
+      <button data-tab="record">录制</button>
+      <button data-tab="scripts">脚本</button>
+      <button data-tab="report">报告</button>
+      <button data-tab="logs">日志</button>
+    </nav>
+    <div class="tab-body">
+
+      <!-- 手动操作 -->
+      <div class="tab-pane active" id="tab-manual">
+        <div class="card">
+          <h3>点击 / 长按</h3>
+          <div class="row">
+            <label class="inline">元素标识</label><input type="text" id="tapId" placeholder="如 btn.counter" style="width:150px">
+            <label class="inline">或坐标</label>
+            <input type="number" id="tapX" placeholder="x"> <input type="number" id="tapY" placeholder="y">
+            <button class="btn primary" onclick="manualTap()">点击</button>
+            <button class="btn" onclick="manualDouble()">双击</button>
+            <input type="number" id="pressDur" value="0.8" step="0.1" title="长按时长(秒)">
+            <button class="btn" onclick="manualPress()">长按</button>
+          </div>
+          <div class="row"><label class="inline">提示：也可以直接点击左侧画面上的位置</label></div>
+        </div>
+        <div class="card">
+          <h3>文本输入</h3>
+          <div class="row">
+            <input type="text" id="typeId" placeholder="输入框标识，如 field.input" style="width:190px">
+            <input type="text" id="typeText" placeholder="要输入的文本" style="flex:1;min-width:180px">
+            <button class="btn primary" onclick="manualType()">输入</button>
+            <button class="btn" onclick="manualClear()">清空</button>
+          </div>
+        </div>
+        <div class="card">
+          <h3>滑动</h3>
+          <div class="row">
+            起点 <input type="number" id="swFx" placeholder="x"> <input type="number" id="swFy" placeholder="y">
+            终点 <input type="number" id="swTx" placeholder="x"> <input type="number" id="swTy" placeholder="y">
+            <input type="number" id="swDur" value="0.4" step="0.1">
+            <button class="btn primary" onclick="manualSwipe()">滑动</button>
+          </div>
+        </div>
+        <div class="card">
+          <h3>最近操作结果</h3>
+          <table id="manualResults"><thead><tr><th style="width:90px">指令</th><th style="width:60px">结果</th><th>详情</th></tr></thead><tbody></tbody></table>
+        </div>
+      </div>
+
+      <!-- 录制 -->
+      <div class="tab-pane" id="tab-record">
+        <div class="card">
+          <h3>操作录制</h3>
+          <div class="row">
+            <button class="btn danger" id="btnRecStart" onclick="recStart()">● 开始录制</button>
+            <button class="btn success" id="btnRecStop" onclick="recStop()" disabled>■ 停止并生成脚本</button>
+            <button class="btn" onclick="recCancel()">丢弃</button>
+            <label class="inline">在 App 上手工操作（或用本页手动操作），停止后自动生成脚本</label>
+          </div>
+        </div>
+        <div class="card">
+          <h3>录制的脚本（可编辑：补充断言、删除多余步骤）</h3>
+          <textarea id="recordEditor" placeholder="停止录制后这里会出现生成的脚本…"></textarea>
+          <div class="row" style="margin-top:10px">
+            <input type="text" id="recordName" placeholder="脚本名，如 登录流程" style="width:180px">
+            <button class="btn primary" onclick="recSave()">保存到脚本库</button>
+            <button class="btn" onclick="loadToScriptsTab()">去脚本页运行</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 脚本 -->
+      <div class="tab-pane" id="tab-scripts">
+        <div class="card script-list" id="scriptList"></div>
+        <div class="card" style="overflow:hidden">
+          <h3>脚本编辑 <span id="scriptNameLabel" class="inline"></span></h3>
+          <textarea id="scriptEditor" placeholder="# 从左侧选择脚本，或从录制页保存
+点击 btn.counter
+断言文本 label.counter 包含 Count: 1"></textarea>
+          <div class="row" style="margin-top:10px">
+            <input type="text" id="scriptName" placeholder="保存名" style="width:160px">
+            <button class="btn" onclick="scriptSave()">保存</button>
+            <button class="btn danger" onclick="scriptDelete()">删除</button>
+            <button class="btn success" onclick="scriptRun()">▶ 运行</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 报告 -->
+      <div class="tab-pane" id="tab-report">
+        <div class="card">
+          <h3>运行报告</h3>
+          <div class="report-summary" id="reportSummary">尚未运行</div>
+          <table id="reportTable"><thead><tr><th style="width:50px">行</th><th style="width:70px">类型</th><th style="width:46px">结果</th><th>描述</th><th>详情</th></tr></thead><tbody></tbody></table>
+          <img id="failShotImg" class="fail-shot" style="display:none">
+        </div>
+      </div>
+
+      <!-- 日志 -->
+      <div class="tab-pane" id="tab-logs">
+        <div class="card"><h3>App 日志（自动滚动，上限 500 条）</h3><div class="log-view" id="logView"></div></div>
+      </div>
+
+    </div>
+  </div>
+</main>
+
+<div id="toast"></div>
+
+<script>
+'use strict';
+let ws = null;
+let shotMeta = null;      // {width, height} 逻辑分辨率
+let selectedNode = null;  // 元素树选中节点
+let autoTimer = null;
+let currentScript = null; // 当前加载的脚本名
+
+// ---------------------------------------------------------------- WebSocket
+function connect() {
+  ws = new WebSocket(`ws://${location.host}/ws`);
+  ws.onopen = () => { refreshShot(0); loadTree(); send({ type: 'dsl_list' }); };
+  ws.onmessage = (ev) => {
+    let msg; try { msg = JSON.parse(ev.data); } catch { return; }
+    handle(msg);
+  };
+  ws.onclose = () => setTimeout(connect, 1500);
+}
+function send(obj) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj)); }
+
+function handle(msg) {
+  switch (msg.type) {
+    case 'app_state':
+      document.getElementById('connDot').classList.toggle('on', msg.connected);
+      document.getElementById('connText').textContent = msg.connected ? '已连接' : '未连接';
+      const env = msg.hello?.environment;
+      document.getElementById('deviceInfo').textContent = env
+        ? `${env.deviceModel} · iOS ${env.systemVersion} · ${Math.round(env.screen.width)}x${Math.round(env.screen.height)}@${env.screen.scale}x · Agent v${env.version}`
+        : '等待 App 连接（ws://…:9800/ws）';
+      break;
+    case 'result':
+      addManualResult(msg.action, msg.ok, msg.ok ? JSON.stringify(msg.data ?? {}).slice(0, 160) : msg.error);
+      if (msg.action === 'record_start') setRecUI(true);
+      break;
+    case 'record_result':
+      setRecUI(false);
+      if (msg.ok) {
+        send({ type: 'dsl_steps_to_text', steps: msg.steps });
+        toast(`录制完成：${msg.steps.length} 步`, 'ok');
+      } else toast('停止录制失败: ' + msg.error, 'err');
+      break;
+    case 'dsl_text':
+      document.getElementById('recordEditor').value = msg.text;
+      break;
+    case 'dsl_list': renderScriptList(msg.files); break;
+    case 'dsl_content':
+      document.getElementById('scriptEditor').value = msg.content ?? '';
+      document.getElementById('scriptName').value = msg.name;
+      currentScript = msg.name;
+      document.getElementById('scriptNameLabel').textContent = `（${msg.name}）`;
+      break;
+    case 'dsl_help': break;
+    case 'app_log': appendLog(msg.message); break;
+    case 'run_start':
+      switchTab('report');
+      document.getElementById('reportSummary').innerHTML = `<span class="badge fail">运行中</span> 共 ${msg.total} 步`;
+      document.querySelector('#reportTable tbody').innerHTML = '';
+      document.getElementById('failShotImg').style.display = 'none';
+      break;
+    case 'run_progress': addReportRow(msg); break;
+    case 'run_done':
+      if (msg.error) { document.getElementById('reportSummary').innerHTML = `<span class="badge fail">失败</span> ${msg.error}`; break; }
+      document.getElementById('reportSummary').innerHTML =
+        `<span class="badge ${msg.ok ? 'pass' : 'fail'}">${msg.ok ? '全部通过 ✅' : '失败 ❌'}</span> ${msg.passed}/${msg.total} 步通过`;
+      if (msg.failShot) {
+        const img = document.getElementById('failShotImg');
+        img.src = msg.failShot; img.style.display = 'block';
+      }
+      toast(msg.ok ? `运行通过 ${msg.passed}/${msg.total}` : `运行失败（${msg.passed}/${msg.total}）`, msg.ok ? 'ok' : 'err');
+      refreshShot(1);
+      break;
+    case 'rpc_ok': toast(msg.message, 'ok'); send({ type: 'dsl_list' }); break;
+    case 'rpc_error': toast(msg.error, 'err'); break;
+  }
+}
+
+// ---------------------------------------------------------------- Tabs
+document.querySelectorAll('nav.tabs button').forEach((b) => {
+  b.onclick = () => switchTab(b.dataset.tab);
+});
+function switchTab(name) {
+  document.querySelectorAll('nav.tabs button').forEach((b) => b.classList.toggle('active', b.dataset.tab === name));
+  document.querySelectorAll('.tab-pane').forEach((p) => p.classList.toggle('active', p.id === 'tab-' + name));
+}
+
+// ---------------------------------------------------------------- 截图
+const shotImg = document.getElementById('shotImg');
+shotImg.onclick = (event) => {
+  if (!shotMeta) return;
+  const rect = shotImg.getBoundingClientRect();
+  const x = (event.clientX - rect.left) / rect.width * shotMeta.width;
+  const y = (event.clientY - rect.top) / rect.height * shotMeta.height;
+  send({ type: 'send', action: 'tap', params: { x: Math.round(x), y: Math.round(y) } });
+  document.getElementById('tapX').value = Math.round(x);
+  document.getElementById('tapY').value = Math.round(y);
+  setTimeout(() => refreshShot(0), 400);
+};
+shotImg.onmousemove = (event) => {
+  if (!shotMeta) return;
+  const rect = shotImg.getBoundingClientRect();
+  const x = Math.round((event.clientX - rect.left) / rect.width * shotMeta.width);
+  const y = Math.round((event.clientY - rect.top) / rect.height * shotMeta.height);
+  document.getElementById('shotHint').textContent = `(${x}, ${y})`;
+};
+
+async function refreshShot(quality) {
+  const reply = await rpc({ type: 'send', action: 'screenshot', params: { quality } });
+  if (reply.ok && reply.data?.image) {
+    shotMeta = { width: reply.data.width, height: reply.data.height };
+    shotImg.src = `data:image/png;base64,${reply.data.image}`;
+  }
+}
+
+document.getElementById('autoRefresh').onchange = (e) => {
+  if (autoTimer) { clearInterval(autoTimer); autoTimer = null; }
+  if (e.target.checked) autoTimer = setInterval(() => refreshShot(0), 3000);
+};
+
+// ---------------------------------------------------------------- 元素树
+async function loadTree() {
+  const reply = await rpc({ type: 'send', action: 'view_tree', params: { maxDepth: 8 } });
+  const wrap = document.getElementById('viewTree');
+  if (!reply.ok) { wrap.textContent = reply.error || '加载失败'; return; }
+  wrap.innerHTML = '';
+  for (const win of reply.data?.windows ?? []) wrap.appendChild(renderNode(win));
+}
+
+function renderNode(node) {
+  const div = document.createElement('div');
+  div.className = 'tree-node';
+  const idSpan = node.identifier ? `<span class="id">${esc(node.identifier)}</span> ` : '';
+  const txt = node.text ? ` <span class="txt">"${esc(String(node.text).slice(0, 14))}"</span>` : '';
+  div.innerHTML = `${idSpan}<span class="cls">${node.class || ''}</span>${txt}`;
+
+  const childrenWrap = document.createElement('div');
+  childrenWrap.className = 'tree-children';
+  (node.children ?? []).slice(0, 60).forEach((c) => childrenWrap.appendChild(renderNode(c)));
+
+  div.onclick = (e) => {
+    e.stopPropagation();
+    document.querySelectorAll('.tree-node').forEach((n) => (n.style.background = ''));
+    div.style.background = '#dbe9ff';
+    selectedNode = node;
+    const f = node.frame ?? {};
+    document.getElementById('treeDetail').textContent =
+      `${node.identifier ?? '(无标识)'} @ (${Math.round(f.x)},${Math.round(f.y)} ${Math.round(f.width)}x${Math.round(f.height)})`;
+    document.getElementById('tapId').value = node.identifier ?? '';
+    document.getElementById('typeId').value = node.identifier ?? '';
+  };
+  const container = document.createElement('div');
+  container.appendChild(div);
+  container.appendChild(childrenWrap);
+  return container;
+}
+
+// ---------------------------------------------------------------- 手动操作
+function rpc(payload) {
+  return new Promise((resolve) => {
+    const tag = 'rpc-' + Math.random();
+    const onMsg = (ev) => {
+      let m; try { m = JSON.parse(ev.data); } catch { return; }
+      if (m.echo === tag) { ws.removeEventListener('message', onMsg); resolve(m); }
+    };
+    ws.addEventListener('message', onMsg);
+    ws.send(JSON.stringify({ ...payload, echo: tag }));
+  });
+}
+
+function manualTap() {
+  const id = val('tapId');
+  if (id) send({ type: 'send', action: 'tap_view', params: { identifier: id } });
+  else send({ type: 'send', action: 'tap', params: { x: num('tapX'), y: num('tapY') } });
+  setTimeout(() => refreshShot(0), 500);
+}
+function manualDouble() { send({ type: 'send', action: 'double_tap', params: { x: num('tapX'), y: num('tapY') } }); }
+function manualPress() {
+  const id = val('tapId');
+  const params = id ? { identifier: id, duration: num('pressDur') } : { x: num('tapX'), y: num('tapY'), duration: num('pressDur') };
+  send({ type: 'send', action: 'long_press', params });
+}
+function manualType() {
+  const id = val('typeId');
+  send({ type: 'send', action: 'type_text', params: id ? { identifier: id, text: val('typeText') } : { text: val('typeText') } });
+}
+function manualClear() { send({ type: 'send', action: 'clear_text', params: { identifier: val('typeId') } }); }
+function manualSwipe() {
+  send({ type: 'send', action: 'swipe', params: { fromX: num('swFx'), fromY: num('swFy'), toX: num('swTx'), toY: num('swTy'), duration: num('swDur') } });
+  setTimeout(() => refreshShot(0), 600);
+}
+
+function addManualResult(action, ok, detail) {
+  const tbody = document.querySelector('#manualResults tbody');
+  const tr = document.createElement('tr');
+  tr.innerHTML = `<td><code>${esc(action)}</code></td>
+    <td class="${ok ? 'ok-text' : 'err-text'}">${ok ? '✓' : '✗'}</td>
+    <td>${esc(detail ?? '')}</td>`;
+  tbody.prepend(tr);
+  while (tbody.children.length > 15) tbody.lastChild.remove();
+}
+
+// ---------------------------------------------------------------- 录制
+function setRecUI(recording) {
+  document.getElementById('recBadge').style.display = recording ? 'inline-block' : 'none';
+  document.getElementById('btnRecStart').disabled = recording;
+  document.getElementById('btnRecStop').disabled = !recording;
+}
+function recStart() { send({ type: 'send', action: 'record_start' }); setRecUI(true); }
+function recStop() { send({ type: 'record_stop' }); }
+function recCancel() { send({ type: 'send', action: 'record_cancel' }); setRecUI(false); }
+function recSave() {
+  const name = val('recordName') || `录制${new Date().toLocaleTimeString().replace(/[: ]/g, '-')}`;
+  send({ type: 'record_save', name, content: val('recordEditor') });
+}
+function loadToScriptsTab() {
+  document.getElementById('scriptEditor').value = val('recordEditor');
+  document.getElementById('scriptName').value = val('recordName');
+  currentScript = null;
+  document.getElementById('scriptNameLabel').textContent = '（未保存）';
+  switchTab('scripts');
+}
+
+// ---------------------------------------------------------------- 脚本管理
+function renderScriptList(files) {
+  const box = document.getElementById('scriptList');
+  box.innerHTML = '<h3>脚本库</h3>';
+  if (!files?.length) { box.innerHTML += '<div class="inline">暂无脚本（可从录制页保存）</div>'; return; }
+  for (const f of files) {
+    const item = document.createElement('div');
+    item.className = 'script-item';
+    item.innerHTML = `<span>${esc(f.name)}</span>`;
+    item.onclick = () => send({ type: 'dsl_read', name: f.name });
+    box.appendChild(item);
+  }
+}
+function scriptSave() {
+  const name = val('scriptName');
+  if (!name) { toast('请填写脚本名', 'err'); return; }
+  send({ type: 'record_save', name, content: val('scriptEditor') });
+  currentScript = name.endsWith('.txt') ? name : name + '.txt';
+  document.getElementById('scriptNameLabel').textContent = `（${currentScript}）`;
+}
+function scriptDelete() {
+  if (!currentScript) { toast('未选择脚本', 'err'); return; }
+  if (!confirm(`删除 ${currentScript}？`)) return;
+  send({ type: 'dsl_delete', name: currentScript });
+  document.getElementById('scriptEditor').value = '';
+  currentScript = null;
+}
+function scriptRun() {
+  const content = val('scriptEditor');
+  if (!content.trim()) { toast('脚本为空', 'err'); return; }
+  send({ type: 'run', content });
+}
+
+// ---------------------------------------------------------------- 报告 & 日志
+function addReportRow(r) {
+  const tbody = document.querySelector('#reportTable tbody');
+  const tr = document.createElement('tr');
+  const kindText = { action: '操作', shot: '截图', assert: '断言' }[r.kind] ?? r.kind;
+  tr.innerHTML = `<td>${r.line}</td><td>${kindText}</td>
+    <td class="${r.pass ? 'ok-text' : 'err-text'}">${r.pass ? '✓' : '✗'}</td>
+    <td><code>${esc(r.desc).slice(0, 80)}</code></td><td>${esc(r.detail ?? '')}</td>`;
+  tbody.appendChild(tr);
+}
+
+function appendLog(message) {
+  const view = document.getElementById('logView');
+  const line = document.createElement('div');
+  line.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+  view.appendChild(line);
+  while (view.children.length > 500) view.firstChild.remove();
+  view.scrollTop = view.scrollHeight;
+}
+
+// ---------------------------------------------------------------- 工具
+function val(id) { return document.getElementById(id).value.trim(); }
+function num(id) { const v = parseFloat(document.getElementById(id).value); return isNaN(v) ? 0 : v; }
+function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+function toast(text, kind = 'ok') {
+  const box = document.getElementById('toast');
+  const item = document.createElement('div');
+  item.className = 'toast-item ' + kind;
+  item.textContent = text;
+  box.appendChild(item);
+  setTimeout(() => item.remove(), 3200);
+}
+
+connect();
+</script>
+</body>
+</html>

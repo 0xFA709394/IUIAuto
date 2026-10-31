@@ -61,7 +61,30 @@ node mock_server.js            # 或交互模式（help 查看指令，含 rec �
 2. App 内顶部"控制服务器"卡片填入 Mac 的局域网地址，如 `ws://192.168.1.10:9800/ws`，点"连接"（地址会持久化）；
 3. 真机与服务器处于同一网络即可收发指令。
 
-## 面向测试人员：录制回放 + DSL 脚本
+## 面向测试人员：GUI 控制台（推荐入口）
+
+零命令行操作的可视化工作台，覆盖完整的测试工作流：
+
+```bash
+cd Tools && node gui_server.js
+# 浏览器打开 http://localhost:9900
+```
+
+| 区域 | 功能 |
+|---|---|
+| 顶部状态栏 | App 连接状态、设备/系统/屏幕信息、录制中 ● REC 指示 |
+| 左侧 · 实时画面 | App 实时截图（可开 3s 自动刷新）；**直接点击画面任意位置 = 对 App 执行点击**，坐标自动换算并回填 |
+| 左侧 · 元素树 | 完整 view 层级（identifier/类型/文本）；点选元素自动填入操作面板 |
+| 手动操作 | 点击/双击/长按（标识或坐标）、文本输入/清空、滑动表单，结果即时反馈 |
+| 录制 | 一键开始/停止，App 手工操作自动转成可编辑 DSL，保存进脚本库 |
+| 脚本 | 脚本库管理（保存/加载/删除）、DSL 编辑器、一键 ▶ 运行 |
+| 报告 | 逐步 ✓/✗ 结果、PASS/FAIL 汇总、**失败自动附现场截图** |
+| 日志 | App 日志实时流 |
+
+GUI 与 CLI（`mock_server.js`/`run_script.js`）共用 9800 端口，**同一时间只启动一个**。
+脚本库存储在 `Tools/scripts/*.txt`，CLI 与 GUI 可共用同一批脚本。
+
+## 录制回放 + DSL 脚本（CLI 方式）
 
 业务测试人员**不需要手写 JSON**。推荐工作流：
 
@@ -104,6 +127,7 @@ node run_script.js 用例1.txt
 
 | 中文 | 英文 | 示例 |
 |---|---|---|
+| 探活 | ping | `探活` |
 | 点击 id 或 x y | tap | `点击 btn.counter` / `点击 201 314` |
 | 双击 x y | dtap | `双击 201 314` |
 | 长按 id或x y [秒] | press | `长按 btn.submit 1.0` |
@@ -187,10 +211,13 @@ tap/长按/滑动按位移(≥14pt)与时长(≥0.45s)自动判定；输入通�
 │       ├── IUAViewIntrospector  # view 树查询/定位
 │       └── IUAScreenshotService # 截图
 └── Tools/                       # 控制端（Node）
+    ├── gui_server.js / gui.html # ★ GUI 控制台（浏览器可视化工作台）
     ├── mock_server.js           # 控制服务器模拟器(交互/--demo 自动验证/rec 录制)
     ├── iua_dsl.js               # DSL 解析器 + 录制步骤→DSL 转换
+    ├── iua_runner.js            # 脚本执行器共享模块(GUI/CLI 复用)
     ├── run_script.js            # 脚本执行器/录制器(断言+报告+exit code)
-    └── record_test.mjs          # 录制功能端到端自检
+    ├── record_test.mjs          # 录制功能端到端自检
+    └── scripts/                 # GUI/CLI 共享的脚本库
 ```
 
 ## 约束与风险说明

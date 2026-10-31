@@ -15,6 +15,7 @@ import { WebSocketServer } from 'ws';
 import { createInterface } from 'node:readline';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { parseScript, stepsToDSL, DSL_HELP } from './iua_dsl.js';
+import { runSteps } from './iua_runner.js';
 
 const PORT = process.env.PORT || 9800;
 const args = process.argv.slice(2);
@@ -58,7 +59,6 @@ if (args[0] === '--record') {
 let socket = null;
 let seq = 0;
 const pending = new Map();
-const results = [];
 let finished = false;
 
 function finish(code) {
@@ -93,24 +93,6 @@ function send(action, params = {}, timeoutSec = 20) {
   });
 }
 
-// ---------------------------------------------------------------- 断言
-async function runAssert(step) {
-  const { kind, identifier, value } = step;
-  if (kind === 'exists' || kind === 'missing') {
-    const r = await send('element_info', { identifier });
-    return kind === 'exists'
-      ? { pass: r.ok, detail: r.ok ? '存在' : '不存在' }
-      : { pass: !r.ok, detail: r.ok ? '仍存在' : '不存在' };
-  }
-  // 文本断言
-  const r = await send('element_info', { identifier });
-  if (!r.ok) return { pass: false, detail: `元素不存在` };
-  const text = r.data?.text ?? '';
-  return kind === 'text_contains'
-    ? { pass: text.includes(value), detail: `实际="${text}"` }
-    : { pass: text === value, detail: `实际="${text}" 期望="${value}"` };
-}
-
 // ---------------------------------------------------------------- 执行脚本
 async function runScript() {
   let steps;
@@ -123,33 +105,14 @@ async function runScript() {
   }
   console.log(`\n执行 ${scriptFile}（${steps.length} 步）\n${'='.repeat(56)}`);
 
-  const sleep = (s) => new Promise(r => setTimeout(r, s * 1000));
-  for (const step of steps) {
-    const tag = `L${String(step.line).padStart(3)}`;
-    if (step.type === 'action') {
-      const r = await send(step.action, step.params);
-      const pass = r.ok;
-      results.push({ line: step.line, desc: `${step.action} ${JSON.stringify(step.params)}`, pass, detail: r.error || '' });
-      console.log(`${pass ? '✓' : '✗'} ${tag} ${step.action} ${JSON.stringify(step.params).slice(0, 60)} ${pass ? '' : '— ' + r.error}`);
-      if (!pass) { await saveShot('fail.png'); break; }
-    } else if (step.type === 'shot') {
-      const r = await send('screenshot', step.params);
-      if (r.ok) { writeFileSync(step.file, Buffer.from(r.data.image, 'base64')); }
-      results.push({ line: step.line, desc: `截图 → ${step.file}`, pass: r.ok, detail: '' });
-      console.log(`${r.ok ? '✓' : '✗'} ${tag} 截图 → ${step.file}${r.ok ? ` (${r.data.width|0}x${r.data.height|0})` : ' — ' + r.error}`);
-    } else if (step.type === 'assert') {
-      const a = await runAssert(step);
-      results.push({ line: step.line, desc: `断言 ${step.kind} ${step.identifier} ${step.value ?? ''}`, pass: a.pass, detail: a.detail });
-      console.log(`${a.pass ? '✓' : '✗'} ${tag} 断言 ${step.kind} ${step.identifier} ${step.value ?? ''} ${a.pass ? '' : '— ' + a.detail}`);
-      if (!a.pass) { await saveShot('fail.png'); break; }
-    }
-    await sleep(0.15);
-  }
+  const outcome = await runSteps(steps, send,
+    (r) => console.log(`${r.pass ? '✓' : '✗'} L${String(r.line).padStart(3)} ${r.desc} ${r.pass ? '' : '— ' + r.detail}`),
+    { shotSaver: async (file, base64) => writeFileSync(file, Buffer.from(base64, 'base64')) });
 
-  const passed = results.filter(r => r.pass).length;
+  if (!outcome.ok) await saveShot('fail.png');
   console.log('='.repeat(56));
-  console.log(`结果: ${passed}/${results.length} 步通过 ${passed === results.length ? '✅ PASS' : '❌ FAIL'}`);
-  finish(passed === results.length && results.length > 0 ? 0 : 1);
+  console.log(`结果: ${outcome.passed}/${outcome.total} 步通过 ${outcome.ok ? '✅ PASS' : '❌ FAIL'}`);
+  finish(outcome.ok ? 0 : 1);
 }
 
 async function saveShot(file) {

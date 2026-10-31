@@ -1,0 +1,9 @@
+# IUIAuto 录制脚本（可手工编辑）
+# 生成时间: 11/1/2026, 3:16:17 AM
+点击 btn.counter
+点击 btn.counter
+清空 field.input
+输入 field.input 第二轮录制文本
+断言文本 label.counter 包含 Count: 7
+断言文本 field.input 等于 第二轮录制文本
+断言存在 btn.submit

@@ -1,0 +1,5 @@
+# IUIAuto 录制脚本（可手工编辑）
+# 生成时间: 11/1/2026, 3:15:23 AM
+点击 btn.counter
+点击 btn.counter
+输入 field.input GUI 输入测试 123GUI录制内容
