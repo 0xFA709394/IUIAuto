@@ -1,0 +1,413 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		060156981B5765356A406B2E /* AppDelegate.m in Sources */ = {isa = PBXBuildFile; fileRef = 6E77871119815D5316CFCF9D /* AppDelegate.m */; };
+		0C0F2E1B8B924423C5758201 /* IUACommand.m in Sources */ = {isa = PBXBuildFile; fileRef = 8E3BC20F6491A9A4BC13255C /* IUACommand.m */; };
+		3FDB78CF913A323E5D1C09D8 /* IUAWebSocketClient.m in Sources */ = {isa = PBXBuildFile; fileRef = DA4AA20775FE4F2E06E9F964 /* IUAWebSocketClient.m */; };
+		631D583EBBF41B61B4438A7C /* IUATextSynthesizer.m in Sources */ = {isa = PBXBuildFile; fileRef = 62652CAC7649179231351E84 /* IUATextSynthesizer.m */; };
+		6F296F80142590AD3E146D36 /* IUACommandResult.m in Sources */ = {isa = PBXBuildFile; fileRef = E7E4187D1341E61535DBE8C3 /* IUACommandResult.m */; };
+		936F0316993F5814B45AC92D /* IUALogger.m in Sources */ = {isa = PBXBuildFile; fileRef = D3595ADE8F7DEC0DC52FF2D5 /* IUALogger.m */; };
+		AB404451B6FD23E2FF2396CC /* IUATouchSynthesizer.m in Sources */ = {isa = PBXBuildFile; fileRef = 2447524D7A84BC8CD95FE337 /* IUATouchSynthesizer.m */; };
+		C25625160B16B5436EF2C7A7 /* DemoViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 996BA46FC831DB291732FF02 /* DemoViewController.m */; };
+		C517B562370748EA1E15F9E4 /* IUAScreenshotService.m in Sources */ = {isa = PBXBuildFile; fileRef = DEFEB3ABBEE0C313BB8409A1 /* IUAScreenshotService.m */; };
+		C608C841DD3B408B837A19D0 /* IUARecorder.m in Sources */ = {isa = PBXBuildFile; fileRef = 2FBB4ACE64B91D1D64736BB0 /* IUARecorder.m */; };
+		C9ED956D75233B5D76298265 /* IUAEngine.m in Sources */ = {isa = PBXBuildFile; fileRef = 993FDE35634F6A1A5B713F59 /* IUAEngine.m */; };
+		D8FB560480B9FEC3B14D8FD1 /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = 2F6115A525419A8F7724C97D /* main.m */; };
+		DBC71367FF43A955CE41E638 /* IUAViewIntrospector.m in Sources */ = {isa = PBXBuildFile; fileRef = 1A585F561089D6EC2572B753 /* IUAViewIntrospector.m */; };
+		DE95E519FC8B755433C6C8F6 /* IUACommandDispatcher.m in Sources */ = {isa = PBXBuildFile; fileRef = E1856D4C5A231F1239EB3B17 /* IUACommandDispatcher.m */; };
+		FEA70A9DFC55B34F3816D445 /* IUAConfiguration.m in Sources */ = {isa = PBXBuildFile; fileRef = 2BA786EB04E775CA8186DA04 /* IUAConfiguration.m */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		14DCCB008578A272AE8D007B /* IUACommandResult.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = IUACommandResult.h; sourceTree = "<group>"; };
+		1A585F561089D6EC2572B753 /* IUAViewIntrospector.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = IUAViewIntrospector.m; sourceTree = "<group>"; };
+		2447524D7A84BC8CD95FE337 /* IUATouchSynthesizer.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = IUATouchSynthesizer.m; sourceTree = "<group>"; };
+		2BA786EB04E775CA8186DA04 /* IUAConfiguration.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = IUAConfiguration.m; sourceTree = "<group>"; };
+		2D14CCA0698A245F353F2C45 /* IUALogger.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = IUALogger.h; sourceTree = "<group>"; };
+		2F6115A525419A8F7724C97D /* main.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
+		2FBB4ACE64B91D1D64736BB0 /* IUARecorder.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = IUARecorder.m; sourceTree = "<group>"; };
+		36F41CC93F8FFD27C9ED3D61 /* IUAViewIntrospector.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = IUAViewIntrospector.h; sourceTree = "<group>"; };
+		37A72A65C07E4E681C76CBDB /* IUATouchSynthesizer.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = IUATouchSynthesizer.h; sourceTree = "<group>"; };
+		3E504E882EA518BD7482A12D /* IUAWebSocketClient.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = IUAWebSocketClient.h; sourceTree = "<group>"; };
+		52417DC7534944E3363452B1 /* IUAScreenshotService.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = IUAScreenshotService.h; sourceTree = "<group>"; };
+		62652CAC7649179231351E84 /* IUATextSynthesizer.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = IUATextSynthesizer.m; sourceTree = "<group>"; };
+		6E77871119815D5316CFCF9D /* AppDelegate.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = AppDelegate.m; sourceTree = "<group>"; };
+		7265DEB636E236104D5BDC37 /* IUATextSynthesizer.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = IUATextSynthesizer.h; sourceTree = "<group>"; };
+		75728E432B30D092E0B6B7C1 /* IUARecorder.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = IUARecorder.h; sourceTree = "<group>"; };
+		79ABDF1B98A95F2DE0B6F79D /* IUACommandDispatcher.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = IUACommandDispatcher.h; sourceTree = "<group>"; };
+		83D9C7082EFDFB0E7BCA3653 /* IUAConfiguration.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = IUAConfiguration.h; sourceTree = "<group>"; };
+		8CA9686312E01D24F56F94F8 /* IUIAuto.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = IUIAuto.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		8E3BC20F6491A9A4BC13255C /* IUACommand.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = IUACommand.m; sourceTree = "<group>"; };
+		993FDE35634F6A1A5B713F59 /* IUAEngine.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = IUAEngine.m; sourceTree = "<group>"; };
+		994AB4AD4DFCFEBCF7F65249 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		996BA46FC831DB291732FF02 /* DemoViewController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = DemoViewController.m; sourceTree = "<group>"; };
+		9F9ECB81420FEC156B4BB300 /* IUACommand.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = IUACommand.h; sourceTree = "<group>"; };
+		C94D050BD7DB45764570A2A6 /* IUAEngine.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = IUAEngine.h; sourceTree = "<group>"; };
+		D3595ADE8F7DEC0DC52FF2D5 /* IUALogger.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = IUALogger.m; sourceTree = "<group>"; };
+		D717520C13A2DB40E9D35CE2 /* AppDelegate.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AppDelegate.h; sourceTree = "<group>"; };
+		DA4AA20775FE4F2E06E9F964 /* IUAWebSocketClient.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = IUAWebSocketClient.m; sourceTree = "<group>"; };
+		DEFEB3ABBEE0C313BB8409A1 /* IUAScreenshotService.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = IUAScreenshotService.m; sourceTree = "<group>"; };
+		E0B6EFD50156C6D7636B8378 /* DemoViewController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = DemoViewController.h; sourceTree = "<group>"; };
+		E1856D4C5A231F1239EB3B17 /* IUACommandDispatcher.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = IUACommandDispatcher.m; sourceTree = "<group>"; };
+		E7E4187D1341E61535DBE8C3 /* IUACommandResult.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = IUACommandResult.m; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		064CCFBBB0A3633CC38FFAA2 /* UI */ = {
+			isa = PBXGroup;
+			children = (
+				E0B6EFD50156C6D7636B8378 /* DemoViewController.h */,
+				996BA46FC831DB291732FF02 /* DemoViewController.m */,
+			);
+			path = UI;
+			sourceTree = "<group>";
+		};
+		17CAB18FA54E2884E9199F39 /* Actions */ = {
+			isa = PBXGroup;
+			children = (
+				75728E432B30D092E0B6B7C1 /* IUARecorder.h */,
+				2FBB4ACE64B91D1D64736BB0 /* IUARecorder.m */,
+				52417DC7534944E3363452B1 /* IUAScreenshotService.h */,
+				DEFEB3ABBEE0C313BB8409A1 /* IUAScreenshotService.m */,
+				7265DEB636E236104D5BDC37 /* IUATextSynthesizer.h */,
+				62652CAC7649179231351E84 /* IUATextSynthesizer.m */,
+				37A72A65C07E4E681C76CBDB /* IUATouchSynthesizer.h */,
+				2447524D7A84BC8CD95FE337 /* IUATouchSynthesizer.m */,
+				36F41CC93F8FFD27C9ED3D61 /* IUAViewIntrospector.h */,
+				1A585F561089D6EC2572B753 /* IUAViewIntrospector.m */,
+			);
+			path = Actions;
+			sourceTree = "<group>";
+		};
+		182EA96A2D6548C1CF197FB2 /* SupportingFiles */ = {
+			isa = PBXGroup;
+			children = (
+				994AB4AD4DFCFEBCF7F65249 /* Info.plist */,
+				2F6115A525419A8F7724C97D /* main.m */,
+			);
+			path = SupportingFiles;
+			sourceTree = "<group>";
+		};
+		27BC3586FEF1A40BEA8FA97C /* Core */ = {
+			isa = PBXGroup;
+			children = (
+				9F9ECB81420FEC156B4BB300 /* IUACommand.h */,
+				8E3BC20F6491A9A4BC13255C /* IUACommand.m */,
+				79ABDF1B98A95F2DE0B6F79D /* IUACommandDispatcher.h */,
+				E1856D4C5A231F1239EB3B17 /* IUACommandDispatcher.m */,
+				14DCCB008578A272AE8D007B /* IUACommandResult.h */,
+				E7E4187D1341E61535DBE8C3 /* IUACommandResult.m */,
+				83D9C7082EFDFB0E7BCA3653 /* IUAConfiguration.h */,
+				2BA786EB04E775CA8186DA04 /* IUAConfiguration.m */,
+				C94D050BD7DB45764570A2A6 /* IUAEngine.h */,
+				993FDE35634F6A1A5B713F59 /* IUAEngine.m */,
+				2D14CCA0698A245F353F2C45 /* IUALogger.h */,
+				D3595ADE8F7DEC0DC52FF2D5 /* IUALogger.m */,
+				3E504E882EA518BD7482A12D /* IUAWebSocketClient.h */,
+				DA4AA20775FE4F2E06E9F964 /* IUAWebSocketClient.m */,
+			);
+			path = Core;
+			sourceTree = "<group>";
+		};
+		667B547EEC780CC279CFD9E2 /* IUIAuto */ = {
+			isa = PBXGroup;
+			children = (
+				17CAB18FA54E2884E9199F39 /* Actions */,
+				84A144E96EB77F962FE22A75 /* App */,
+				27BC3586FEF1A40BEA8FA97C /* Core */,
+				182EA96A2D6548C1CF197FB2 /* SupportingFiles */,
+				064CCFBBB0A3633CC38FFAA2 /* UI */,
+			);
+			path = IUIAuto;
+			sourceTree = "<group>";
+		};
+		765741340772EEC807DBF141 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				8CA9686312E01D24F56F94F8 /* IUIAuto.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		84A144E96EB77F962FE22A75 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				D717520C13A2DB40E9D35CE2 /* AppDelegate.h */,
+				6E77871119815D5316CFCF9D /* AppDelegate.m */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		9E5F54AC81020D73FB94AD8C = {
+			isa = PBXGroup;
+			children = (
+				667B547EEC780CC279CFD9E2 /* IUIAuto */,
+				765741340772EEC807DBF141 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		0A3CC427538BDF3A9CA00B45 /* IUIAuto */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 32E9486AC8B50D33B4DE2838 /* Build configuration list for PBXNativeTarget "IUIAuto" */;
+			buildPhases = (
+				946CD05D65C506527D701627 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = IUIAuto;
+			packageProductDependencies = (
+			);
+			productName = IUIAuto;
+			productReference = 8CA9686312E01D24F56F94F8 /* IUIAuto.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		C923C70B84D2CF36288E5BB9 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					0A3CC427538BDF3A9CA00B45 = {
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = 6AE463D10A35B9E674DB8056 /* Build configuration list for PBXProject "IUIAuto" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 9E5F54AC81020D73FB94AD8C;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 765741340772EEC807DBF141 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				0A3CC427538BDF3A9CA00B45 /* IUIAuto */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		946CD05D65C506527D701627 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				060156981B5765356A406B2E /* AppDelegate.m in Sources */,
+				C25625160B16B5436EF2C7A7 /* DemoViewController.m in Sources */,
+				0C0F2E1B8B924423C5758201 /* IUACommand.m in Sources */,
+				DE95E519FC8B755433C6C8F6 /* IUACommandDispatcher.m in Sources */,
+				6F296F80142590AD3E146D36 /* IUACommandResult.m in Sources */,
+				FEA70A9DFC55B34F3816D445 /* IUAConfiguration.m in Sources */,
+				C9ED956D75233B5D76298265 /* IUAEngine.m in Sources */,
+				936F0316993F5814B45AC92D /* IUALogger.m in Sources */,
+				C608C841DD3B408B837A19D0 /* IUARecorder.m in Sources */,
+				C517B562370748EA1E15F9E4 /* IUAScreenshotService.m in Sources */,
+				631D583EBBF41B61B4438A7C /* IUATextSynthesizer.m in Sources */,
+				AB404451B6FD23E2FF2396CC /* IUATouchSynthesizer.m in Sources */,
+				DBC71367FF43A955CE41E638 /* IUAViewIntrospector.m in Sources */,
+				3FDB78CF913A323E5D1C09D8 /* IUAWebSocketClient.m in Sources */,
+				D8FB560480B9FEC3B14D8FD1 /* main.m in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		1FB3E7870ED44074E981CD51 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = IUIAuto/SupportingFiles/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.iuiauto.agent;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		3F8011627023831F77B424EA /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 13.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = "";
+			};
+			name = Debug;
+		};
+		AA7AAE09D6643DB39A570794 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = IUIAuto/SupportingFiles/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.iuiauto.agent;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		AACF118B35848783A13ED901 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 13.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = "";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		32E9486AC8B50D33B4DE2838 /* Build configuration list for PBXNativeTarget "IUIAuto" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				1FB3E7870ED44074E981CD51 /* Debug */,
+				AA7AAE09D6643DB39A570794 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		6AE463D10A35B9E674DB8056 /* Build configuration list for PBXProject "IUIAuto" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				3F8011627023831F77B424EA /* Debug */,
+				AACF118B35848783A13ED901 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = C923C70B84D2CF36288E5BB9 /* Project object */;
+}

@@ -1,0 +1,9 @@
+# IUIAuto 录制脚本（可手工编辑）
+# 生成时间: 11/1/2026, 2:38:22 AM
+点击 btn.counter
+点击 btn.counter
+输入 field.input 录制内容测试
+滑动 200 620 200 340   # slider.demo
+
+断言文本 label.counter 包含 Count: 4
+断言存在 field.input

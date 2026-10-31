@@ -1,0 +1,36 @@
+name: IUIAuto
+options:
+  bundleIdPrefix: com.iuiauto
+  createIntermediateGroups: true
+  deploymentTarget:
+    iOS: "13.0"
+
+settings:
+  base:
+    CODE_SIGN_STYLE: Automatic
+    SWIFT_VERSION: ""          # 纯 Objective-C 项目
+
+targets:
+  IUIAuto:
+    type: application
+    platform: iOS
+    sources:
+      - path: IUIAuto
+    info:
+      path: IUIAuto/SupportingFiles/Info.plist
+      properties:
+        CFBundleDisplayName: IUIAuto
+        CFBundleShortVersionString: "1.0.0"
+        CFBundleVersion: "1"
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        # 内网自动化工具：允许明文 ws://（模拟器回环/局域网服务器）
+        NSAppTransportSecurity:
+          NSAllowsArbitraryLoads: true
+        ITSAppUsesNonExemptEncryption: false
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.iuiauto.agent
+        TARGETED_DEVICE_FAMILY: "1,2"
+        GENERATE_INFOPLIST_FILE: NO

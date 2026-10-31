@@ -1,0 +1,10 @@
+{
+  "name": "iuiauto-mock-server",
+  "version": "1.0.0",
+  "description": "IUIAuto 控制服务器模拟器：下发 JSON 指令、收集 App 回传结果",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}
