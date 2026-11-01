@@ -193,6 +193,8 @@
             <button class="btn" onclick="scriptSave()">保存</button>
             <button class="btn danger" onclick="scriptDelete()">删除</button>
             <button class="btn success" onclick="scriptRun()">▶ 运行</button>
+            <label class="inline"><input type="checkbox" id="optPerf" checked> 性能监测(CPU/内存/FPS)</label>
+            <label class="inline"><input type="checkbox" id="optXctrace"> xctrace 录制</label>
           </div>
         </div>
       </div>
@@ -204,6 +206,15 @@
           <div class="report-summary" id="reportSummary">尚未运行</div>
           <table id="reportTable"><thead><tr><th style="width:50px">行</th><th style="width:70px">类型</th><th style="width:46px">结果</th><th>描述</th><th>详情</th></tr></thead><tbody></tbody></table>
           <img id="failShotImg" class="fail-shot" style="display:none">
+        </div>
+        <div class="card" id="perfCard" style="display:none">
+          <h3>性能摘要（App 内采样）</h3>
+          <div class="row"><span id="perfMeta" class="inline"></span></div>
+          <table id="perfTable"><thead><tr><th style="width:150px">指标</th><th>min</th><th>avg</th><th>p95</th><th>max</th></tr></thead><tbody></tbody></table>
+        </div>
+        <div class="card" id="xctraceCard" style="display:none">
+          <h3>xctrace 录制</h3>
+          <div id="xctraceInfo" class="inline"></div>
         </div>
       </div>
 
@@ -286,6 +297,7 @@ function handle(msg) {
         const img = document.getElementById('failShotImg');
         img.src = msg.failShot; img.style.display = 'block';
       }
+      renderPerf(msg.perf, msg.xctrace);
       toast(msg.ok ? `运行通过 ${msg.passed}/${msg.total}` : `运行失败（${msg.passed}/${msg.total}）`, msg.ok ? 'ok' : 'err');
       refreshShot(1);
       break;
@@ -469,7 +481,9 @@ function scriptDelete() {
 function scriptRun() {
   const content = val('scriptEditor');
   if (!content.trim()) { toast('脚本为空', 'err'); return; }
-  send({ type: 'run', content });
+  send({ type: 'run', content,
+         perf: document.getElementById('optPerf').checked,
+         xctrace: document.getElementById('optXctrace').checked });
 }
 
 // ---------------------------------------------------------------- 报告 & 日志
@@ -482,6 +496,41 @@ function addReportRow(r) {
     <td><code>${esc(r.desc).slice(0, 80)}</code></td><td>${esc(r.detail ?? '')}</td>`;
   tbody.appendChild(tr);
 }
+
+// 渲染性能摘要卡（App 采样 + xctrace）
+function renderPerf(perf, xctrace) {
+  const card = document.getElementById('perfCard');
+  const tbody = document.querySelector('#perfTable tbody');
+  tbody.innerHTML = '';
+  if (!perf || !perf.cpuPercent) { card.style.display = 'none'; }
+  else {
+    card.style.display = 'block';
+    document.getElementById('perfMeta').textContent = `时长 ${perf.duration}s · ${perf.sampleCount} 个采样点`;
+    const rows = [
+      ['CPU%（单核=100）', perf.cpuPercent],
+      ['系统 CPU%', perf.cpuSystemPercent],
+      ['物理内存 (MB)', perf.memoryMB],
+      ['FPS（有帧窗口）', perf.fps],
+    ];
+    for (const [label, s] of rows) {
+      if (!s) continue;
+      tbody.insertAdjacentHTML('beforeend',
+        `<tr><td>${label}</td><td>${s.min ?? '-'}</td><td>${round1(s.avg)}</td><td>${s.p95 ?? '-'}</td><td>${s.max ?? '-'}</td></tr>`);
+    }
+  }
+  const xcCard = document.getElementById('xctraceCard');
+  if (!xctrace) { xcCard.style.display = 'none'; }
+  else {
+    xcCard.style.display = 'block';
+    const s = xctrace.summary;
+    document.getElementById('xctraceInfo').innerHTML =
+      `${xctrace.tracePath ? `trace 文件：<code>${esc(xctrace.tracePath)}</code>（${xctrace.sizeMB}MB，可拖入 Instruments 分析）<br>` : ''}` +
+      (s && s.cpuPercent ? `导出摘要：样本 ${s.samples}，CPU% avg ${s.cpuPercent.avg} / max ${s.cpuPercent.max}` +
+        (s.physicalFootprintMB ? `，物理内存 avg ${round1(s.physicalFootprintMB.avg)}MB` : '')
+        : (xctrace.reason ? `<span class="err-text">${esc(xctrace.reason)}</span>` : '（trace 暂无可导出的摘要数据）'));
+  }
+}
+const round1 = (v) => v == null ? '-' : Math.round(v * 10) / 10;
 
 function appendLog(message) {
   const view = document.getElementById('logView');

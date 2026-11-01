@@ -7,6 +7,7 @@ iOS 自动化操作项目的 iOS 端：一个纯 Objective-C App，作为常驻 
 - ✅ 零第三方依赖（WebSocket 用系统 `NSURLSessionWebSocketTask`）
 - ✅ **录制回放**：真机手工操作一遍，自动生成可读脚本（`Tools/run_script.js --record`）
 - ✅ **中文 DSL 脚本 + 断言**：业务测试人员无需手写 JSON（`点击 btn.counter` / `断言文本 label.counter 包含 Count: 2`）
+- ✅ **性能监测**：脚本运行期间自动采样 App CPU/内存/FPS 并输出报告摘要；可同步调用 **xctrace** 录制 `.trace`（真机全模板可用）
 - ⚠️ 合成触控仅作用于**本 App 进程内**（非越狱 iOS 的沙箱限制，无法跨 App）
 
 ## 工作原理
@@ -82,7 +83,61 @@ cd Tools && node gui_server.js
 | 日志 | App 日志实时流 |
 
 GUI 与 CLI（`mock_server.js`/`run_script.js`）共用 9800 端口，**同一时间只启动一个**。
+端口被旧实例占用时会给出友好提示（含占用进程 pid 与处理指引），也可以 `--takeover` 自动接管：
+
+```bash
+node gui_server.js --takeover     # 自动结束本工具旧实例并接管端口（不会动其他程序）
+```
 脚本库存储在 `Tools/scripts/*.txt`，CLI 与 GUI 可共用同一批脚本。
+
+## 性能监测（脚本运行期间的 CPU / 内存 / FPS / xctrace）
+
+在 UI 自动化执行的同时观察被测 App 的性能，双数据源设计：
+
+### 1. App 内采样（任何环境可靠，默认开启）
+
+```bash
+node run_script.js --perf 用例1.txt          # CLI：运行期间 0.5s 周期采样
+```
+GUI：脚本页勾选「性能监测」→ 运行结束后报告页直接显示性能摘要表。
+
+报告示例：
+```
+── 性能摘要（App 内采样）─────────────────────
+时长 4.0s / 8 点
+CPU%       min 0.2 | avg 21.0 | p95 112.3 | max 112.3
+系统CPU%   min 1.0 | avg 7.9 | p95 19.8 | max 19.8
+物理内存MB min 24.5 | avg 31.0 | p95 32.0 | max 32.0
+FPS        min 48 | avg 56.3 | p95 61 | max 61
+```
+
+数据来自 App 端 `IUAPerfSampler`（公开 mach API：`task_threads`+`thread_info` 算 CPU、
+`TASK_VM_INFO` 的 `phys_footprint` 算内存、`CADisplayLink` 算 FPS），真机/模拟器均可用。
+也可单独调用指令：`perf_start` / `perf_stop` / `perf_sample`（即时单点）。
+
+### 2. xctrace 录制（深度分析，Instruments 可视化）
+
+```bash
+node run_script.js --xctrace 用例1.txt              # 默认 Time Profiler
+node run_script.js --xctrace="Allocations" 用例1.txt # 指定模板
+node run_script.js --perf --xctrace 用例1.txt        # 双数据源同时开启
+```
+
+- 测试运行期间自动 `xctrace record --attach`，结束后停止并保存 `.trace` 到 `Tools/traces/`
+- trace 文件可直接拖入 Xcode Instruments GUI 做火焰图/内存曲线等深度分析
+- 尽力导出摘要（`sysmon-process` 等 schema 的 CPU%/内存序列）
+- **环境限制（实测）**：模拟器上 Activity Monitor 等服务不可用（真机专属）、Time Profiler 在部分
+  环境 CLI 停止管线挂起——封装对此做了超时保护与**优雅降级**（记录原因、不阻塞测试）；
+  真机部署时全模板预期可用
+- GUI：脚本页勾选「xctrace 录制」，报告页显示 trace 路径与导出摘要
+
+### 相关新增指令/能力
+
+| 指令/DSL | 说明 |
+|---|---|
+| `perf_start` / `perf_stop` / `perf_sample` | App 内性能采样控制 |
+| `dismiss_keyboard`（DSL：`收起键盘`） | 收起软键盘（避免遮挡点击） |
+| `tap_view` 自动滚动 | 元素不在可视区时自动 `scrollRectToVisible` 再点击，并带重试 |
 
 ## 录制回放 + DSL 脚本（CLI 方式）
 
@@ -128,6 +183,7 @@ node run_script.js 用例1.txt
 | 中文 | 英文 | 示例 |
 |---|---|---|
 | 探活 | ping | `探活` |
+| 收起键盘 | dismiss | `收起键盘` |
 | 点击 id 或 x y | tap | `点击 btn.counter` / `点击 201 314` |
 | 双击 x y | dtap | `双击 201 314` |
 | 长按 id或x y [秒] | press | `长按 btn.submit 1.0` |

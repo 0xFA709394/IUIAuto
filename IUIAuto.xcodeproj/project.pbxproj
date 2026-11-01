@@ -18,6 +18,7 @@
 		C517B562370748EA1E15F9E4 /* IUAScreenshotService.m in Sources */ = {isa = PBXBuildFile; fileRef = DEFEB3ABBEE0C313BB8409A1 /* IUAScreenshotService.m */; };
 		C608C841DD3B408B837A19D0 /* IUARecorder.m in Sources */ = {isa = PBXBuildFile; fileRef = 2FBB4ACE64B91D1D64736BB0 /* IUARecorder.m */; };
 		C9ED956D75233B5D76298265 /* IUAEngine.m in Sources */ = {isa = PBXBuildFile; fileRef = 993FDE35634F6A1A5B713F59 /* IUAEngine.m */; };
+		CA0E6B6D3A2C96679448448A /* IUAPerfSampler.m in Sources */ = {isa = PBXBuildFile; fileRef = BAFC7008B7692053EEC1EE36 /* IUAPerfSampler.m */; };
 		D8FB560480B9FEC3B14D8FD1 /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = 2F6115A525419A8F7724C97D /* main.m */; };
 		DBC71367FF43A955CE41E638 /* IUAViewIntrospector.m in Sources */ = {isa = PBXBuildFile; fileRef = 1A585F561089D6EC2572B753 /* IUAViewIntrospector.m */; };
 		DE95E519FC8B755433C6C8F6 /* IUACommandDispatcher.m in Sources */ = {isa = PBXBuildFile; fileRef = E1856D4C5A231F1239EB3B17 /* IUACommandDispatcher.m */; };
@@ -48,6 +49,8 @@
 		994AB4AD4DFCFEBCF7F65249 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		996BA46FC831DB291732FF02 /* DemoViewController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = DemoViewController.m; sourceTree = "<group>"; };
 		9F9ECB81420FEC156B4BB300 /* IUACommand.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = IUACommand.h; sourceTree = "<group>"; };
+		BAFC7008B7692053EEC1EE36 /* IUAPerfSampler.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = IUAPerfSampler.m; sourceTree = "<group>"; };
+		C898B7892E822BB7FA013EA9 /* IUAPerfSampler.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = IUAPerfSampler.h; sourceTree = "<group>"; };
 		C94D050BD7DB45764570A2A6 /* IUAEngine.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = IUAEngine.h; sourceTree = "<group>"; };
 		D3595ADE8F7DEC0DC52FF2D5 /* IUALogger.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = IUALogger.m; sourceTree = "<group>"; };
 		D717520C13A2DB40E9D35CE2 /* AppDelegate.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AppDelegate.h; sourceTree = "<group>"; };
@@ -71,6 +74,8 @@
 		17CAB18FA54E2884E9199F39 /* Actions */ = {
 			isa = PBXGroup;
 			children = (
+				C898B7892E822BB7FA013EA9 /* IUAPerfSampler.h */,
+				BAFC7008B7692053EEC1EE36 /* IUAPerfSampler.m */,
 				75728E432B30D092E0B6B7C1 /* IUARecorder.h */,
 				2FBB4ACE64B91D1D64736BB0 /* IUARecorder.m */,
 				52417DC7534944E3363452B1 /* IUAScreenshotService.h */,
@@ -218,6 +223,7 @@
 				FEA70A9DFC55B34F3816D445 /* IUAConfiguration.m in Sources */,
 				C9ED956D75233B5D76298265 /* IUAEngine.m in Sources */,
 				936F0316993F5814B45AC92D /* IUALogger.m in Sources */,
+				CA0E6B6D3A2C96679448448A /* IUAPerfSampler.m in Sources */,
 				C608C841DD3B408B837A19D0 /* IUARecorder.m in Sources */,
 				C517B562370748EA1E15F9E4 /* IUAScreenshotService.m in Sources */,
 				631D583EBBF41B61B4438A7C /* IUATextSynthesizer.m in Sources */,

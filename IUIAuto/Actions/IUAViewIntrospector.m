@@ -29,15 +29,28 @@
 }
 
 + (nullable UIWindow *)keyWindow {
-    if (@available(iOS 15.0, *)) {
-        for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
-            if ([scene isKindOfClass:[UIWindowScene class]]) {
-                UIWindowScene *windowScene = (UIWindowScene *)scene;
-                if (windowScene.keyWindow) {
-                    return windowScene.keyWindow;
-                }
+    // 排除键盘等系统浮层（动画期间 scene.keyWindow 可能短暂返回 UITextEffectsWindow）
+    UIWindow *fallback = nil;
+    for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
+        if (![scene isKindOfClass:[UIWindowScene class]]) {
+            continue;
+        }
+        UIWindowScene *windowScene = (UIWindowScene *)scene;
+        for (UIWindow *window in windowScene.windows) {
+            if ([window isKindOfClass:NSClassFromString(@"UITextEffectsWindow")] ||
+                [window isKindOfClass:NSClassFromString(@"UICallBarWindow")]) {
+                continue;
+            }
+            if (window.isKeyWindow) {
+                return window;
+            }
+            if (!fallback && window.rootViewController != nil) {
+                fallback = window;
             }
         }
+    }
+    if (fallback) {
+        return fallback;
     }
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"

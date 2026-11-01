@@ -405,39 +405,60 @@ static BOOL IUASendMsgObject(id target, NSArray<NSString *> *names, id object) {
 
 - (UIView * _Nullable)hitViewAtPoint:(CGPoint)point inWindow:(UIWindow *)window {
     if (!window) {
+        IUALogError(@"[diag] hitView 失败: window 为 nil");
         return nil;
     }
-    return [window hitTest:point withEvent:nil];
+    UIView *hit = [window hitTest:point withEvent:nil];
+    if (!hit) {
+        IUALogError(@"[diag] hitView 失败: point=(%.1f,%.1f) window=%@ bounds=%@",
+                    point.x, point.y, window, NSStringFromCGRect(window.bounds));
+        // 探测：point 落在哪个 window
+        for (UIWindow *w in [self allWindowsForDiag]) {
+            IUALogError(@"[diag] window: %@ frame=%@ hidden=%d key=%d",
+                        w, NSStringFromCGRect(w.frame), w.hidden, w.isKeyWindow);
+        }
+    }
+    return hit;
+}
+
+- (NSArray<UIWindow *> *)allWindowsForDiag {
+    NSMutableArray *windows = [NSMutableArray array];
+    for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
+        if ([scene isKindOfClass:[UIWindowScene class]]) {
+            [windows addObjectsFromArray:((UIWindowScene *)scene).windows];
+        }
+    }
+    return windows;
 }
 
 - (UIWindow *)targetWindow {
-    UIWindow *keyWindow = nil;
-    if (@available(iOS 15.0, *)) {
-        for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
-            if ([scene isKindOfClass:[UIWindowScene class]]) {
-                UIWindowScene *windowScene = (UIWindowScene *)scene;
-                if (windowScene.activationState == UISceneActivationStateForegroundActive &&
-                    windowScene.keyWindow != nil) {
-                    keyWindow = windowScene.keyWindow;
-                    break;
-                }
+    // 排除系统浮层 window（键盘 UITextEffectsWindow、呼叫条等）：
+    // 键盘弹出/收起动画期间 scene.keyWindow 可能短暂返回它们
+    UIWindow *fallback = nil;
+    for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
+        if (![scene isKindOfClass:[UIWindowScene class]]) {
+            continue;
+        }
+        UIWindowScene *windowScene = (UIWindowScene *)scene;
+        for (UIWindow *window in windowScene.windows) {
+            if ([self isSystemOverlayWindow:window]) {
+                continue;
+            }
+            if (window.isKeyWindow) {
+                return window;
+            }
+            if (!fallback && window.rootViewController != nil) {
+                fallback = window;
             }
         }
     }
-    if (@available(iOS 15.0, *)) {
-        if (!keyWindow) {
-            for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
-                if ([scene isKindOfClass:[UIWindowScene class]]) {
-                    UIWindowScene *windowScene = (UIWindowScene *)scene;
-                    if (windowScene.keyWindow) {
-                        keyWindow = windowScene.keyWindow;
-                        break;
-                    }
-                }
-            }
-        }
-    }
-    return keyWindow;
+    return fallback;
+}
+
+- (BOOL)isSystemOverlayWindow:(UIWindow *)window {
+    if ([window isKindOfClass:NSClassFromString(@"UITextEffectsWindow")]) return YES;
+    if ([window isKindOfClass:NSClassFromString(@"UICallBarWindow")]) return YES;
+    return NO;
 }
 
 - (NSError *)errorWithText:(NSString *)text {

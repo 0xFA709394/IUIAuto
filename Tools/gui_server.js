@@ -3,6 +3,7 @@
  * IUIAuto GUI 控制台服务器
  *
  *   node gui_server.js            # 默认 HTTP :9900（浏览器），App 连 ws://...:9800/ws
+ *   node gui_server.js --takeover # 端口被旧实例占用时自动接管
  *   PORT=9900 APP_PORT=9800 node gui_server.js
  *
  * 职责：
@@ -20,6 +21,19 @@ import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
 import { parseScript, stepsToDSL, DSL_HELP } from './iua_dsl.js';
 import { runSteps } from './iua_runner.js';
+import { startXctraceRecording } from './iua_perf.js';
+import { ensurePortFree, handleListenError } from './iua_ports.js';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+const execFileAsync = promisify(execFile);
+
+async function detectBootedSimulator() {
+  const { stdout } = await execFileAsync('xcrun', ['simctl', 'list', 'devices', 'booted'], {
+    env: { ...process.env, DEVELOPER_DIR: process.env.DEVELOPER_DIR || '/Applications/Xcode.app/Contents/Developer' },
+  }).catch(() => ({ stdout: '' }));
+  const m = stdout.match(/\(([0-9A-F-]{36})\)/);
+  return m ? m[1] : null;
+}
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const HTTP_PORT = +(process.env.PORT || 9900);
@@ -43,7 +57,13 @@ function sendToApp(action, params = {}, timeoutSec = 20) {
   });
 }
 
+// ---------------------------------------------------------------- 端口检查（占用时友好提示 / --takeover 自动接管）
+const TAKEOVER = process.argv.includes('--takeover');
+await ensurePortFree(APP_PORT, { takeover: TAKEOVER, label: 'App 连接端口' });
+await ensurePortFree(HTTP_PORT, { takeover: TAKEOVER, label: '控制台 HTTP 端口' });
+
 const appWss = new WebSocketServer({ port: APP_PORT, path: '/ws' });
+appWss.on('error', (e) => handleListenError(e, APP_PORT));
 console.log(`[gui] App 端口 ws://0.0.0.0:${APP_PORT}/ws（等待 App 连接）`);
 
 appWss.on('connection', (ws) => {
@@ -148,16 +168,41 @@ browserWss.on('connection', (ws) => {
             break;
           }
           running = true;
-          broadcast({ type: 'run_start', total: steps.length });
+          const perfOn = !!msg.perf;
+          const xctraceOn = !!msg.xctrace;
+          broadcast({ type: 'run_start', total: steps.length, perf: perfOn, xctrace: xctraceOn });
+
+          // App 端性能采样
+          if (perfOn) await sendToApp('perf_start', { interval: 0.5 });
+          // xctrace 宿主侧录制（环境受限自动降级，不阻塞测试）
+          let xctraceSession = null;
+          if (xctraceOn) {
+            const udid = await detectBootedSimulator();
+            if (udid) {
+              xctraceSession = startXctraceRecording({
+                deviceUDID: udid, processName: 'IUIAuto', template: 'Time Profiler',
+                outputDir: join(SCRIPTS_DIR, '..', 'traces'),
+              });
+              const ready = await xctraceSession.waitUntilRecording(30000);
+              if (!ready.ok) { xctraceSession.abort(); xctraceSession = null; broadcast({ type: 'app_log', level: 2, message: `xctrace 不可用已降级: ${ready.reason}` }); }
+            }
+          }
+
           const outcome = await runSteps(steps, sendToApp, (r) => broadcast({ type: 'run_progress', ...r }));
           running = false;
+
+          const perfData = perfOn ? ((await sendToApp('perf_stop')).data ?? null) : null;
+          let xctraceResult = null;
+          if (xctraceSession) xctraceResult = await xctraceSession.stop();
+
           // 失败时抓现场截图推给浏览器
           let failShot = null;
           if (!outcome.ok) {
             const s = await sendToApp('screenshot', { quality: 1 });
             if (s.ok) failShot = `data:image/png;base64,${s.data.image}`;
           }
-          broadcast({ type: 'run_done', passed: outcome.passed, total: outcome.total, ok: outcome.ok, failShot });
+          broadcast({ type: 'run_done', passed: outcome.passed, total: outcome.total, ok: outcome.ok,
+                      failShot, perf: perfData, xctrace: xctraceResult });
           break;
         }
         default:
@@ -171,6 +216,7 @@ browserWss.on('connection', (ws) => {
   ws.on('close', () => browserSockets.delete(ws));
 });
 
+httpServer.on('error', (e) => handleListenError(e, HTTP_PORT));
 httpServer.listen(HTTP_PORT, () => {
   console.log(`[gui] 控制台已启动: http://localhost:${HTTP_PORT}`);
 });

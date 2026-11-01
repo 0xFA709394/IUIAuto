@@ -14,6 +14,7 @@
 #import "IUAViewIntrospector.h"
 #import "IUAScreenshotService.h"
 #import "IUARecorder.h"
+#import "IUAPerfSampler.h"
 
 NSString *const IUAEngineConnectionDidChangeNotification = @"IUAEngineConnectionDidChangeNotification";
 
@@ -192,14 +193,12 @@ static BOOL IUALoadPointFromIdentifier(NSString *identifier, CGPoint *outPoint, 
 
     simple(@"tap", ^(IUACommand *cmd, void (^finish)(BOOL, NSDictionary *, NSString *)) {
         NSString *identifier = [cmd stringParam:@"identifier"];
-        CGPoint point = CGPointZero;
         if (identifier.length > 0) {
-            NSString *errorText = nil;
-            if (!IUALoadPointFromIdentifier(identifier, &point, &errorText)) {
-                finish(NO, nil, errorText);
-                return;
-            }
-        } else if (!IUALoadPoint(cmd.params, @"", @"x", @"y", &point)) {
+            [self tapIdentifier:identifier completion:finish];
+            return;
+        }
+        CGPoint point = CGPointZero;
+        if (!IUALoadPoint(cmd.params, @"", @"x", @"y", &point)) {
             finish(NO, nil, @"tap 需要 params.x/y 或 params.identifier");
             return;
         }
@@ -214,15 +213,7 @@ static BOOL IUALoadPointFromIdentifier(NSString *identifier, CGPoint *outPoint, 
             finish(NO, nil, @"tap_view 需要 params.identifier");
             return;
         }
-        CGPoint point = CGPointZero;
-        NSString *errorText = nil;
-        if (!IUALoadPointFromIdentifier(identifier, &point, &errorText)) {
-            finish(NO, nil, errorText);
-            return;
-        }
-        [[IUATouchSynthesizer shared] tapAtPoint:point tapCount:1 completion:^(NSError * _Nullable error) {
-            error ? finish(NO, nil, error.localizedDescription) : finish(YES, @{@"x" : @(point.x), @"y" : @(point.y)}, nil);
-        }];
+        [self tapIdentifier:identifier completion:finish];
     });
 
     simple(@"double_tap", ^(IUACommand *cmd, void (^finish)(BOOL, NSDictionary *, NSString *)) {
@@ -353,6 +344,102 @@ static BOOL IUALoadPointFromIdentifier(NSString *identifier, CGPoint *outPoint, 
         finish(YES, @{@"recording" : @(IUARecorder.shared.isRecording),
                       @"steps" : @(IUARecorder.shared.stepCount)}, nil);
     });
+
+    // ---- 性能采样：App 进程内 CPU/内存/FPS（与宿主侧 xctrace 互补，任何环境可用）----
+    simple(@"perf_start", ^(IUACommand *cmd, void (^finish)(BOOL, NSDictionary *, NSString *)) {
+        double interval = [cmd floatParam:@"interval" default:0.5];
+        BOOL started = [IUAPerfSampler.shared startSamplingWithInterval:interval];
+        finish(started ? YES : NO,
+               @{@"sampling" : @YES, @"interval" : @(interval)},
+               started ? nil : @"已有采样在进行中");
+    });
+
+    simple(@"perf_stop", ^(IUACommand *cmd, void (^finish)(BOOL, NSDictionary *, NSString *)) {
+        NSDictionary *stats = [IUAPerfSampler.shared stopSampling];
+        if (!stats) {
+            finish(NO, nil, @"当前没有采样在进行");
+            return;
+        }
+        // timeline 可能很大，默认剔除（可选 includeTimeline=1 保留）
+        BOOL includeTimeline = [cmd integerParam:@"includeTimeline" default:0] == 1;
+        if (includeTimeline) {
+            finish(YES, stats, nil);
+        } else {
+            NSMutableDictionary *slim = [stats mutableCopy];
+            [slim removeObjectForKey:@"timeline"];
+            finish(YES, slim, nil);
+        }
+    });
+
+    simple(@"perf_sample", ^(IUACommand *cmd, void (^finish)(BOOL, NSDictionary *, NSString *)) {
+        finish(YES, [IUAPerfSampler instantSample], nil);
+    });
+
+    simple(@"dismiss_keyboard", ^(IUACommand *cmd, void (^finish)(BOOL, NSDictionary *, NSString *)) {
+        UIWindow *window = [IUAViewIntrospector keyWindow];
+        BOOL resigned = [window endEditing:YES];
+        finish(YES, @{@"keyboardDismissed" : @(resigned)}, nil);
+    });
+}
+
+#pragma mark - identifier 点击（自动滚动到可视区 + 重试）
+
+/// 按 identifier 点击：元素不在可视区时先自动滚动到可见（沿祖先找 UIScrollView），
+/// 再执行触控；触控失败自动重试（等待滚动惯性/键盘动画结束）。
+- (void)tapIdentifier:(NSString *)identifier completion:(void (^)(BOOL, NSDictionary *, NSString *))finish {
+    [self tapIdentifier:identifier attempt:0 completion:finish];
+}
+
+- (void)tapIdentifier:(NSString *)identifier
+               attempt:(NSUInteger)attempt
+             completion:(void (^)(BOOL, NSDictionary *, NSString *))finish {
+    UIView *view = [IUAViewIntrospector findViewWithIdentifier:identifier];
+    if (!view || view.hidden || view.alpha < 0.01) {
+        finish(NO, nil, [NSString stringWithFormat:@"找不到可见的 view: identifier=%@", identifier]);
+        return;
+    }
+    [self ensureViewVisible:view];
+
+    UIWindow *window = view.window ?: [IUAViewIntrospector keyWindow];
+    CGPoint point = [view convertPoint:CGPointMake(CGRectGetMidX(view.bounds), CGRectGetMidY(view.bounds))
+                                toView:window];
+    [[IUATouchSynthesizer shared] tapAtPoint:point tapCount:1 completion:^(NSError * _Nullable error) {
+        if (!error) {
+            finish(YES, @{@"x" : @(point.x), @"y" : @(point.y)}, nil);
+            return;
+        }
+        if (attempt + 1 < 3) {
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)),
+                           dispatch_get_main_queue(), ^{
+                [self tapIdentifier:identifier attempt:attempt + 1 completion:finish];
+            });
+            return;
+        }
+        finish(NO, nil, error.localizedDescription);
+    }];
+}
+
+/// 中心点不在可视 window 内（含状态栏上方）时，滚动最近的 UIScrollView 祖先使其可见
+- (void)ensureViewVisible:(UIView *)view {
+    UIWindow *window = view.window ?: [IUAViewIntrospector keyWindow];
+    if (!window) {
+        return;
+    }
+    CGPoint center = [view convertPoint:CGPointMake(CGRectGetMidX(view.bounds), CGRectGetMidY(view.bounds))
+                                 toView:window];
+    if (CGRectContainsPoint(window.bounds, center) && center.y >= 44 && center.y <= window.bounds.size.height - 20) {
+        return; // 已在可视区（留出状态栏/底部 Home 指示条余量）
+    }
+    UIView *ancestor = view.superview;
+    while (ancestor && ![ancestor isKindOfClass:[UIScrollView class]]) {
+        ancestor = ancestor.superview;
+    }
+    if ([ancestor isKindOfClass:[UIScrollView class]]) {
+        UIScrollView *scrollView = (UIScrollView *)ancestor;
+        CGRect rectInView = [view convertRect:view.bounds toView:scrollView];
+        [scrollView scrollRectToVisible:rectInView animated:NO];
+        IUALogInfo(@"元素不在可视区，已滚动 UIScrollView 使其可见（中心 y=%.0f）", center.y);
+    }
 }
 
 #pragma mark - 上行发送

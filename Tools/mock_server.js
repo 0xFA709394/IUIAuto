@@ -28,6 +28,7 @@ import { WebSocketServer } from 'ws';
 import { createInterface } from 'node:readline';
 import { writeFileSync } from 'node:fs';
 import { stepsToDSL } from './iua_dsl.js';
+import { ensurePortFree, handleListenError } from './iua_ports.js';
 
 const PORT = process.env.PORT || 9800;
 const DEMO = process.argv.includes('--demo');
@@ -36,7 +37,11 @@ let socket = null;
 let seq = 0;
 const pending = new Map(); // id -> {resolve, timer}
 
+// 端口占用时友好提示 / --takeover 自动接管
+await ensurePortFree(PORT, { takeover: process.argv.includes('--takeover'), label: '服务端口' });
+
 const wss = new WebSocketServer({ port: PORT, path: '/ws' });
+wss.on('error', (e) => handleListenError(e, PORT));
 console.log(`[mock-server] listening on ws://0.0.0.0:${PORT}/ws`);
 
 wss.on('connection', (ws, req) => {

@@ -28,6 +28,7 @@ const ALIASES = {
   '滑动': 'swipe', 'swipe': 'swipe',
   '捏合': 'pinch', 'pinch': 'pinch',
   '等待': 'wait', 'wait': 'wait', 'sleep': 'wait',
+  '收起键盘': 'keyboard', '收键盘': 'keyboard', 'dismiss': 'keyboard', 'keyboard': 'keyboard',
   '截图': 'shot', 'shot': 'shot', 'screenshot': 'shot',
   '断言文本': 'atext', 'assert-text': 'atext', 'asserttext': 'atext',
   '断言存在': 'aexists', 'assert-exists': 'aexists', 'assertexists': 'aexists',
@@ -114,6 +115,9 @@ export function parseScript(text) {
         steps.push(action('wait', { seconds: Math.min(sec, 60) }, lineNo));
         break;
       }
+      case 'keyboard':
+        steps.push(action('dismiss_keyboard', {}, lineNo));
+        break;
       case 'shot': {
         const params = { quality: 1 };
         steps.push({ type: 'shot', file: args[0] || 'shot.png', params, line: lineNo });
