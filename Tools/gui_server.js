@@ -38,6 +38,7 @@ async function detectBootedSimulator() {
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const HTTP_PORT = +(process.env.PORT || 9900);
 const APP_PORT = +(process.env.APP_PORT || 9800);
+const DEVELOPER_DIR = process.env.DEVELOPER_DIR || '/Applications/Xcode.app/Contents/Developer';
 const SCRIPTS_DIR = join(__dirname, 'scripts');
 if (!existsSync(SCRIPTS_DIR)) mkdirSync(SCRIPTS_DIR, { recursive: true });
 
@@ -220,6 +221,21 @@ httpServer.on('error', (e) => handleListenError(e, HTTP_PORT));
 httpServer.listen(HTTP_PORT, () => {
   console.log(`[gui] 控制台已启动: http://localhost:${HTTP_PORT}`);
 });
+
+// ---------------------------------------------------------------- 启动环境自检（新手引导）
+(async () => {
+  const udid = await detectBootedSimulator().catch(() => null);
+  if (!udid) {
+    console.log('[gui] ⚠ 未检测到已启动的模拟器 → App 无法连接。');
+    console.log('    处理: ./build.sh --boot-only   （或在 Xcode 里启动一个模拟器）');
+    return;
+  }
+  const installed = await execFileAsync('xcrun', ['simctl', 'get_app_container', udid, 'com.iuiauto.agent'], { env: { ...process.env, DEVELOPER_DIR } }).catch(() => null);
+  if (!installed) {
+    console.log(`[gui] ⚠ 模拟器(${udid.slice(0, 8)}…)上未安装 IUIAuto App。`);
+    console.log('    处理: ./build.sh   （一键编译+安装+启动）');
+  }
+})();
 
 // ---------------------------------------------------------------- 工具函数
 function pick(r) { return { ok: r.ok, data: r.data ?? null, error: r.error ?? null, elapsed: r.elapsed ?? 0 }; }

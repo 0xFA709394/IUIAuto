@@ -31,43 +31,40 @@ IUATouchSynthesizer IUATextSynthesizer IUAViewIntrospector IUAScreenshotService
 
 ## 快速开始
 
-### 1. 编译（或用 Xcode 打开 `IUIAuto.xcodeproj`）
+### 测试人员（一条命令，浏览器操作）
 
 ```bash
-brew install xcodegen          # 若未安装
-xcodegen generate              # 重新生成工程（改了文件结构后需要）
-xcodebuild -project IUIAuto.xcodeproj -scheme IUIAuto \
-  -sdk iphonesimulator -destination 'platform=iOS Simulator' build
+./start.sh     # 自动：依赖检查 → 模拟器/App 就绪(缺失自动构建) → GUI 控制台 → 打开浏览器
 ```
 
-> 本机 `xcode-select` 指向 CommandLineTools 时，给命令加前缀
-> `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer`。
+打开后按页面顶部「🚀 快速上手」三步走：**确认连接 → 点画面直接操作 → 录制脚本回放**。
+脚本编辑页自带「命令参考」，点击即插入命令模板，不需要背语法。
 
-### 2. 启动控制服务器（模拟器）
+- 模拟器场景开箱即用（默认连 `ws://127.0.0.1:9800/ws`）
+- 真机：App 顶部"控制服务器"卡片填 Mac 局域网地址（如 `ws://192.168.1.10:9800/ws`）→ 点"连接"
+- 重启 GUI：再跑一次 `./start.sh`（端口被旧实例占用会自动接管）
+
+### 开发人员
 
 ```bash
-cd Tools && npm install
-node mock_server.js --demo     # 自动演示：连接后自动执行全流程并输出 PASS/FAIL
-node mock_server.js            # 或交互模式（help 查看指令，含 rec 录制）
+./build.sh     # 一键：生成工程 → 编译 → 安装到模拟器 → 启动 App
+               # 自动处理 xcode-select 指向 CLT / xcodegen 缺失等环境问题
+make test      # 端到端验证：demo 12 断言 + 录制回放 + CLI 脚本执行
+make gui       # 等价 ./start.sh；其他目标见 Makefile
 ```
 
-### 3. 运行 App
+也可用 Xcode 打开 `IUIAuto.xcodeproj` 手动构建；**改动文件结构（新增/删除源文件）后**需 `xcodegen generate`（`./build.sh` 已自动处理）。真机部署：Xcode 选开发团队签名即可。
 
-模拟器安装启动后，Agent 自动连接 `ws://127.0.0.1:9800/ws`（模拟器内 127.0.0.1 即 Mac 本机）。
-`--demo` 模式会自动执行：tap_view 点击计数按钮 → 坐标点击 → 验证计数 +2 → 中文文本输入 → 提交联动 → 上滑滚动 → 截图 → view_tree，12 项断言全部通过即为链路正常。
+### 环境要求
 
-### 4. 真机部署
-
-1. Xcode 打开工程，Signing & Capabilities 选择你的开发团队；
-2. App 内顶部"控制服务器"卡片填入 Mac 的局域网地址，如 `ws://192.168.1.10:9800/ws`，点"连接"（地址会持久化）；
-3. 真机与服务器处于同一网络即可收发指令。
+macOS + Xcode（含 iOS 模拟器运行时）+ Node.js 18+。首次运行会自动安装 xcodegen（brew）与 ws（npm）。
 
 ## 面向测试人员：GUI 控制台（推荐入口）
 
-零命令行操作的可视化工作台，覆盖完整的测试工作流：
+零命令行操作的可视化工作台（`./start.sh` 即达），也可手动启动：
 
 ```bash
-cd Tools && node gui_server.js
+cd Tools && node gui_server.js [--takeover]
 # 浏览器打开 http://localhost:9900
 ```
 

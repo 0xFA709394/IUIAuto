@@ -81,6 +81,17 @@
   .badge.pass { background: #e6f9ec; color: var(--green); }
   .badge.fail { background: #ffeceb; color: var(--red); }
   .fail-shot { max-width: 100%; border: 2px solid var(--red); border-radius: 8px; margin-top: 10px; }
+
+  /* 新手引导 & 命令参考 */
+  .onboard { display: flex; gap: 10px; }
+  .onboard .step-box { flex: 1; background: #f0f6ff; border: 1px solid #cfe3ff; border-radius: 8px; padding: 10px 12px; }
+  .onboard .step-no { display: inline-block; background: var(--blue); color: #fff; border-radius: 50%; width: 20px; height: 20px; text-align: center; line-height: 20px; font-size: 12px; font-weight: 700; margin-right: 6px; }
+  .onboard .step-box b { font-size: 13px; }
+  .onboard .step-box p { color: var(--muted); font-size: 12px; margin-top: 6px; }
+  .cmd-grid { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .cmd-chip { background: #f0f2f5; border: 1px solid var(--border); border-radius: 6px; padding: 4px 10px; font-family: var(--mono); font-size: 11.5px; cursor: pointer; }
+  .cmd-chip:hover { background: #e3f0ff; border-color: var(--blue); }
+  .cmd-chip .tip { font-family: -apple-system, sans-serif; color: var(--muted); font-size: 10.5px; margin-left: 4px; }
 </style>
 </head>
 <body>
@@ -121,6 +132,15 @@
 
       <!-- 手动操作 -->
       <div class="tab-pane active" id="tab-manual">
+        <div class="card" id="onboardCard">
+          <h3>🚀 快速上手（点这里了解本页怎么用）</h3>
+          <div class="onboard">
+            <div class="step-box"><span class="step-no">1</span><b>确认连接</b><p>顶部显示「已连接」+ 设备信息；左侧画面是 App 实时截图，点「刷新」试试。</p></div>
+            <div class="step-box"><span class="step-no">2</span><b>直接操作</b><p>点击左侧画面任意位置 = 对 App 真实点击；hover 可看坐标。或用下方表单按元素标识操作。</p></div>
+            <div class="step-box"><span class="step-no">3</span><b>录制脚本</b><p>「录制」页点开始 → 手工操作 App → 停止后自动生成脚本，补几行断言即可反复运行。</p></div>
+          </div>
+          <div class="row" style="margin-top:8px"><button class="btn small" onclick="dismissOnboard()">我已了解，不再显示</button></div>
+        </div>
         <div class="card">
           <h3>点击 / 长按</h3>
           <div class="row">
@@ -185,6 +205,10 @@
         <div class="card script-list" id="scriptList"></div>
         <div class="card" style="overflow:hidden">
           <h3>脚本编辑 <span id="scriptNameLabel" class="inline"></span></h3>
+          <div style="border:1px solid var(--border); border-radius:8px; padding:8px 10px; margin-bottom:8px">
+            <label class="inline">📐 命令参考（点击插入到光标处）</label>
+            <div class="cmd-grid" id="cmdGrid"></div>
+          </div>
           <textarea id="scriptEditor" placeholder="# 从左侧选择脚本，或从录制页保存
 点击 btn.counter
 断言文本 label.counter 包含 Count: 1"></textarea>
@@ -542,6 +566,48 @@ function appendLog(message) {
 }
 
 // ---------------------------------------------------------------- 工具
+// 新手引导记忆
+function dismissOnboard() {
+  document.getElementById('onboardCard').style.display = 'none';
+  try { localStorage.setItem('iua_onboarded', '1'); } catch {}
+}
+try { if (localStorage.getItem('iua_onboarded') === '1') dismissOnboard(); } catch {}
+
+// DSL 命令参考（点击插入）
+const DSL_COMMANDS = [
+  { ins: '点击 btn.counter', tip: '按标识点击' },
+  { ins: '点击 201 314', tip: '按坐标' },
+  { ins: '双击 201 314', tip: '' },
+  { ins: '长按 btn.submit 1.0', tip: '可选秒数' },
+  { ins: '输入 field.input 文本内容', tip: '先清空再输入' },
+  { ins: '清空 field.input', tip: '' },
+  { ins: '滑动 200 600 200 300 0.4', tip: '起点 终点 [秒]' },
+  { ins: '收起键盘', tip: '防遮挡' },
+  { ins: '等待 1', tip: '秒' },
+  { ins: '截图 demo.png', tip: '' },
+  { ins: '断言文本 label.counter 包含 Count: 1', tip: '包含' },
+  { ins: '断言文本 label.counter 等于 Count: 1', tip: '等于' },
+  { ins: '断言存在 btn.submit', tip: '' },
+  { ins: '断言不存在 btn.gone', tip: '' },
+];
+(function renderCmds() {
+  const grid = document.getElementById('cmdGrid');
+  for (const c of DSL_COMMANDS) {
+    const chip = document.createElement('span');
+    chip.className = 'cmd-chip';
+    chip.innerHTML = `${esc(c.ins)}${c.tip ? `<span class="tip">${c.tip}</span>` : ''}`;
+    chip.title = '点击插入: ' + c.ins;
+    chip.onclick = () => {
+      const editor = document.getElementById('scriptEditor');
+      const nl = editor.value && !editor.value.endsWith('\n') ? '\n' : '';
+      editor.value += nl + c.ins + '\n';
+      editor.focus();
+      editor.selectionStart = editor.selectionEnd = editor.value.length;
+    };
+    grid.appendChild(chip);
+  }
+})();
+
 function val(id) { return document.getElementById(id).value.trim(); }
 function num(id) { const v = parseFloat(document.getElementById(id).value); return isNaN(v) ? 0 : v; }
 function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
