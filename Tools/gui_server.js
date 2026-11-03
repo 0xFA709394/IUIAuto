@@ -67,7 +67,16 @@ const appWss = new WebSocketServer({ port: APP_PORT, path: '/ws' });
 appWss.on('error', (e) => handleListenError(e, APP_PORT));
 console.log(`[gui] App 端口 ws://0.0.0.0:${APP_PORT}/ws（等待 App 连接）`);
 
+const connectHint = setTimeout(() => {
+  if (!appSocket) {
+    console.log('[gui] ⚠ 15 秒了 App 还没连上：');
+    console.log('    处理: ./build.sh 或 ./start.sh（自动拉起模拟器与 App）');
+    console.log('    若模拟器窗口长时间失焦，App 会被冻结（App Nap）→ 点一下模拟器窗口唤醒');
+  }
+}, 15000);
+
 appWss.on('connection', (ws) => {
+  clearTimeout(connectHint);
   console.log('[gui] App 已连接');
   appSocket = ws;
   ws.on('message', (data) => {

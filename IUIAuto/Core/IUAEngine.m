@@ -408,7 +408,8 @@ static BOOL IUALoadPointFromIdentifier(NSString *identifier, CGPoint *outPoint, 
             finish(YES, @{@"x" : @(point.x), @"y" : @(point.y)}, nil);
             return;
         }
-        if (attempt + 1 < 3) {
+        // 冷启动/布局未完成时元素 frame 可能暂无效，最多重试 6 次（约 3s）
+        if (attempt + 1 < 6) {
             dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)),
                            dispatch_get_main_queue(), ^{
                 [self tapIdentifier:identifier attempt:attempt + 1 completion:finish];

@@ -15,7 +15,19 @@ const pending = new Map();
 
 const wss = new WebSocketServer({ port: 9800, path: '/ws' });
 console.log('[record_test] 监听 9800，等待 App 连接…');
+const connectHint = setTimeout(() => {
+  console.log('\n⚠ 15 秒了 App 还没连上：./build.sh 或 ./start.sh 可自动拉起模拟器与 App');
+  console.log('  · 模拟器窗口失焦过久会冻结 App（App Nap）→ 点一下模拟器窗口唤醒\n');
+}, 15000);
+let flowStarted = false;
 wss.on('connection', (ws) => {
+  clearTimeout(connectHint);
+  // App 启动初期的连接风暴（旧 client 断开+新 client 建立）不应让流程跑两遍
+  if (flowStarted) {
+    console.log('[record_test] 忽略重复连接（流程已在执行）');
+    try { ws.close(); } catch {}
+    return;
+  }
   console.log('[record_test] App 已连接');
   socket = ws;
   ws.on('message', (data) => {
@@ -38,6 +50,7 @@ const send = (action, params = {}, timeoutSec = 15) => new Promise((resolve) => 
 });
 
 async function main() {
+  flowStarted = true;
   const checks = [];
   const check = (name, cond, detail = '') => {
     checks.push(cond);

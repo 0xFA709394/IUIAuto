@@ -227,10 +227,11 @@ static double IUALogicalCpuCount(void) {
     NSDictionary *stats = @{
         @"duration" : @(round(duration * 10) / 10),
         @"sampleCount" : @(timeline.count),
-        @"cpuPercent" : IUASummaryOfNumbers(cpuArr),
-        @"cpuSystemPercent" : IUASummaryOfNumbers(sysArr),
+        // 无有效样本时返回 null（而非空字典），避免下游把 {} 当作有效统计
+        @"cpuPercent" : cpuArr.count ? IUASummaryOfNumbers(cpuArr) : [NSNull null],
+        @"cpuSystemPercent" : sysArr.count ? IUASummaryOfNumbers(sysArr) : [NSNull null],
         @"memoryMB" : IUASummaryOfNumbers(physArr),
-        @"fps" : IUASummaryOfNumbers(fpsArr),
+        @"fps" : fpsArr.count ? IUASummaryOfNumbers(fpsArr) : [NSNull null],
         @"timeline" : timeline,
     };
     IUALogInfo(@"性能采样结束：%lu 点，%.1fs", (unsigned long)timeline.count, duration);
@@ -280,7 +281,7 @@ static NSDictionary *IUASummaryOfNumbers(NSArray<NSNumber *> *numbers) {
     }
     return @{
         @"min" : @([sorted.firstObject doubleValue]),
-        @"avg" : @(sum / sorted.count),
+        @"avg" : @(round(sum / sorted.count * 10) / 10),
         @"max" : @([sorted.lastObject doubleValue]),
         @"p95" : @([sorted[p95Index] doubleValue]),
     };

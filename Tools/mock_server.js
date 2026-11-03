@@ -35,6 +35,7 @@ const DEMO = process.argv.includes('--demo');
 
 let socket = null;
 let seq = 0;
+let demoStarted = false;
 const pending = new Map(); // id -> {resolve, timer}
 
 // 端口占用时友好提示 / --takeover 自动接管
@@ -44,7 +45,17 @@ const wss = new WebSocketServer({ port: PORT, path: '/ws' });
 wss.on('error', (e) => handleListenError(e, PORT));
 console.log(`[mock-server] listening on ws://0.0.0.0:${PORT}/ws`);
 
+// 等待 App 提示（避免无提示干等）
+const connectHint = setTimeout(() => {
+  console.log('\n⚠ 15 秒了 App 还没连上，请检查：');
+  console.log('  · 模拟器与 App 是否在运行 → ./build.sh 或 ./start.sh 可自动拉起');
+  console.log('  · App 状态页显示的地址是否为本机 9800（卸载重装 App 可恢复默认）');
+  console.log('  · 端口是否被其他工具占用 → 加 --takeover 接管');
+  console.log('  · 模拟器窗口失焦过久会冻结 App（App Nap）→ 点一下模拟器窗口或 open -a Simulator 唤醒\n');
+}, 15000);
+
 wss.on('connection', (ws, req) => {
+  clearTimeout(connectHint);
   console.log(`[mock-server] App 已连接 (${req.socket.remoteAddress})`);
   socket = ws;
 
@@ -62,7 +73,9 @@ wss.on('connection', (ws, req) => {
   ws.on('error', (e) => console.log('[mock-server] 连接错误:', e.message));
 
   if (DEMO) {
-    setTimeout(runDemo, 800);
+    if (demoStarted) { console.log('[mock-server] 忽略重复触发的 demo'); return; }
+    demoStarted = true;
+    setTimeout(runDemo, 1500);   // 给冷启动 App 的 UI 布局留余量
   } else {
     console.log('\n输入指令（help 查看示例）:');
   }
