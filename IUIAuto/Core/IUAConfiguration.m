@@ -41,7 +41,9 @@ static NSString *const kDefaultServerURL = @"ws://127.0.0.1:9800/ws";
 }
 
 + (NSTimeInterval)reconnectMaxInterval {
-    return 30.0;
+    // 上限 10s：控制端工具的等待窗口通常 15~20s，
+    // 30s 退避会与"server 后启动"场景完美错开（实测漏连）
+    return 10.0;
 }
 
 + (NSTimeInterval)defaultCommandTimeout {

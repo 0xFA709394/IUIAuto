@@ -28,7 +28,7 @@ import { WebSocketServer } from 'ws';
 import { createInterface } from 'node:readline';
 import { writeFileSync } from 'node:fs';
 import { stepsToDSL } from './iua_dsl.js';
-import { ensurePortFree, handleListenError } from './iua_ports.js';
+import { ensurePortFree, handleListenError, tryWakeApp } from './iua_ports.js';
 
 const PORT = process.env.PORT || 9800;
 const DEMO = process.argv.includes('--demo');
@@ -46,9 +46,10 @@ wss.on('error', (e) => handleListenError(e, PORT));
 console.log(`[mock-server] listening on ws://0.0.0.0:${PORT}/ws`);
 
 // 等待 App 提示（避免无提示干等）
-const connectHint = setTimeout(() => {
-  console.log('\n⚠ 15 秒了 App 还没连上，请检查：');
-  console.log('  · 模拟器与 App 是否在运行 → ./build.sh 或 ./start.sh 可自动拉起');
+const connectHint = setTimeout(async () => {
+  console.log('\n⚠ 15 秒了 App 还没连上，自动尝试拉起 App…');
+  const woken = await tryWakeApp().catch(() => false);
+  console.log(woken ? '  · 已尝试启动 App（若模拟器失焦冻结，请点一下模拟器窗口）' : '  · 未找到已启动的模拟器 → ./build.sh 或 ./start.sh 可自动拉起');
   console.log('  · App 状态页显示的地址是否为本机 9800（卸载重装 App 可恢复默认）');
   console.log('  · 端口是否被其他工具占用 → 加 --takeover 接管');
   console.log('  · 模拟器窗口失焦过久会冻结 App（App Nap）→ 点一下模拟器窗口或 open -a Simulator 唤醒\n');

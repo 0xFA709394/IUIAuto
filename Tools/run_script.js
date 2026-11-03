@@ -17,7 +17,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { parseScript, stepsToDSL, DSL_HELP } from './iua_dsl.js';
 import { runSteps } from './iua_runner.js';
 import { startXctraceRecording, perfText } from './iua_perf.js';
-import { ensurePortFree, handleListenError } from './iua_ports.js';
+import { ensurePortFree, handleListenError, tryWakeApp } from './iua_ports.js';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 const execFileAsync = promisify(execFile);
@@ -97,9 +97,10 @@ await ensurePortFree(PORT, { takeover: process.argv.includes('--takeover'), labe
 const wss = new WebSocketServer({ port: PORT, path: '/ws' });
 wss.on('error', (e) => handleListenError(e, PORT));
 console.log(`[run_script] 监听 ws://0.0.0.0:${PORT}/ws，等待 App 连接…（App 会自动重连过来）`);
-const connectHint = setTimeout(() => {
-  console.log('\n⚠ 15 秒了 App 还没连上，请检查：');
-  console.log('  · 模拟器与 App 是否在运行 → ./build.sh 或 ./start.sh 可自动拉起');
+const connectHint = setTimeout(async () => {
+  console.log('\n⚠ 15 秒了 App 还没连上，自动尝试拉起 App…');
+  const woken = await tryWakeApp().catch(() => false);
+  console.log(woken ? '  · 已尝试启动 App（若模拟器失焦冻结，请点一下模拟器窗口）' : '  · 未找到已启动的模拟器 → ./build.sh 或 ./start.sh 可自动拉起');
   console.log('  · App 状态页显示的地址是否为本机 9800（卸载重装 App 可恢复默认）');
   console.log('  · 模拟器窗口失焦过久会冻结 App（App Nap）→ 点一下模拟器窗口或 open -a Simulator 唤醒\n');
 }, 15000);

@@ -99,3 +99,17 @@ export function handleListenError(err, port) {
   }
   process.exit(1);
 }
+
+/**
+ * 尝试拉起/唤醒 App（处理最常见的"App 没在跑"场景）。
+ * 对已运行但被 App Nap 冻结的 App 无效（simctl launch 不激活），此时靠提示用户点击模拟器窗口。
+ * 返回 true 表示已尝试启动。
+ */
+export async function tryWakeApp(bundleId = 'com.iuiauto.agent') {
+  const env = { ...process.env, DEVELOPER_DIR: process.env.DEVELOPER_DIR || '/Applications/Xcode.app/Contents/Developer' };
+  const { stdout } = await execFileAsync('xcrun', ['simctl', 'list', 'devices', 'booted'], { env }).catch(() => ({ stdout: '' }));
+  const udid = (stdout.match(/\(([0-9A-F-]{36})\)/) || [])[1];
+  if (!udid) return false;
+  const r = await execFileAsync('xcrun', ['simctl', 'launch', udid, bundleId], { env }).catch(() => null);
+  return !!r;
+}
