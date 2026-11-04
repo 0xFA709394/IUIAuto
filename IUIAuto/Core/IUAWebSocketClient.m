@@ -42,6 +42,13 @@ typedef NS_ENUM(NSUInteger, IUAWSState) {
     return self.state == IUAWSStateConnected;
 }
 
+- (void)dealloc {
+    // 循环引用兜底：session 强引用 self，正常路径靠 disconnect 打破；
+    // 若外部未 disconnect 即释放（父对象不再持有时 session 仍持 self），
+    // 这里 invalidate 让 session 放开引用
+    [_session finishTasksAndInvalidate];
+}
+
 #pragma mark - 连接管理
 
 - (void)connect {
@@ -69,6 +76,12 @@ typedef NS_ENUM(NSUInteger, IUAWSState) {
         self.manualDisconnected = YES;
         [self teardownTask];
         self.state = IUAWSStateIdle;
+        // NSURLSession 强引用 delegate(self) 且持有系统资源：不 invalidate 会
+        // 造成 session↔client 循环引用泄漏（每次 engine 重启泄漏一整个 session）
+        if (self->_session) {
+            [self->_session finishTasksAndInvalidate];
+            self->_session = nil;
+        }
         IUALogInfo(@"WS: 已主动断开");
         if ([self.delegate respondsToSelector:@selector(webSocketDidDisconnectManually:)]) {
             [self.delegate webSocketDidDisconnectManually:self];

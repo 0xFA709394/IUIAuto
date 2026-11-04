@@ -9,8 +9,11 @@ TOOLS=Tools
 step() { printf '\n\033[1;36m▸ %s\033[0m\n' "$1"; }
 
 # xcode-select 未指向 Xcode 时自动纠正（同 build.sh）
+# 注意不能用 "[ -d ... ] && export"：条件为假时整体返回非零，set -e 会静默退出脚本
 if ! xcode-select -p 2>/dev/null | grep -q "Xcode.app"; then
-  [ -d /Applications/Xcode.app ] && export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
+  if [ -d /Applications/Xcode.app ]; then
+    export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
+  fi
 fi
 
 # 1) Node 依赖
@@ -53,7 +56,7 @@ else
       echo "  App 未运行，启动中…"
       xcrun simctl launch "$BOOTED" com.iuiauto.agent >/dev/null
     else
-      echo "  App 运行中"
+      echo "  App 运行中（若模拟器窗口长时间失焦 App 可能被冻结，点一下窗口唤醒）"
     fi
   fi
 fi

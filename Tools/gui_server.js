@@ -54,7 +54,14 @@ function sendToApp(action, params = {}, timeoutSec = 20) {
     const id = `g-${++appSeq}`;
     const timer = setTimeout(() => { appPending.delete(id); resolve({ ok: false, error: `超时 ${timeoutSec}s` }); }, timeoutSec * 1000);
     appPending.set(id, { resolve, timer });
-    appSocket.send(JSON.stringify({ id, action, params, timeout: timeoutSec }));
+    try {
+      appSocket.send(JSON.stringify({ id, action, params, timeout: timeoutSec }));
+    } catch {
+      // readyState 检查后连接恰好死亡：同步 throw 会 reject 整个 Promise 链
+      clearTimeout(timer);
+      appPending.delete(id);
+      resolve({ ok: false, error: 'App 连接已断开' });
+    }
   });
 }
 

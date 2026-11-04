@@ -21,6 +21,18 @@ NSString *const IUAEngineConnectionDidChangeNotification = @"IUAEngineConnection
 static NSString *const IUAActionErrorDomain = @"IUAActionErrorDomain";
 
 /// 从 params 中解析点坐标：{"x":..,"y":..} 顶层或 {"from":{"x","y"}} 形式
+/// NSNumber 直接可用；NSString 必须能完整解析为数值（"12.5" ✓ "abc"/"12x" ✗）
+static BOOL IUAIsNumeric(id value) {
+    if ([value isKindOfClass:[NSNumber class]]) return YES;
+    if (![value isKindOfClass:[NSString class]]) return NO;
+    NSString *trimmed = [(NSString *)value stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
+    if (trimmed.length == 0) return NO;
+    const char *cstr = trimmed.UTF8String;
+    char *end = NULL;
+    strtod(cstr, &end);
+    return end != cstr && *end == '\0' && end != NULL;
+}
+
 static BOOL IUALoadPoint(NSDictionary<NSString *, id> * _Nullable params,
                          NSString *prefix, NSString *xKey, NSString *yKey, CGPoint *outPoint) {
     id x = params[xKey];
@@ -30,13 +42,12 @@ static BOOL IUALoadPoint(NSDictionary<NSString *, id> * _Nullable params,
         if (!x && sub) x = sub[@"x"];
         if (!y && sub) y = sub[@"y"];
     }
-    BOOL xNum = [x isKindOfClass:[NSNumber class]] || [x isKindOfClass:[NSString class]];
-    BOOL yNum = [y isKindOfClass:[NSNumber class]] || [y isKindOfClass:[NSString class]];
-    if (!xNum || !yNum) {
+    // 数值校验：任意字符串（如 "abc"→0.0）不得混过校验变成点击 (0,0)
+    if (!IUAIsNumeric(x) || !IUAIsNumeric(y)) {
         return NO;
     }
-    outPoint->x = [x respondsToSelector:@selector(doubleValue)] ? [x doubleValue] : 0;
-    outPoint->y = [y respondsToSelector:@selector(doubleValue)] ? [y doubleValue] : 0;
+    outPoint->x = [x doubleValue];
+    outPoint->y = [y doubleValue];
     return YES;
 }
 
