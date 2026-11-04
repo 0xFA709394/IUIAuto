@@ -78,7 +78,10 @@ const connectHint = setTimeout(() => {
 appWss.on('connection', (ws) => {
   clearTimeout(connectHint);
   console.log('[gui] App 已连接');
+  // 新连接顶替旧连接（App 重启/双进程）：关闭旧的，避免向死连接发送
+  if (appSocket && appSocket !== ws) { try { appSocket.close(); } catch {} }
   appSocket = ws;
+  ws.on('close', () => { if (appSocket === ws) { appSocket = null; broadcast({ type: 'app_state', connected: false, hello: null }); } });
   ws.on('message', (data) => {
     let msg; try { msg = JSON.parse(data.toString()); } catch { return; }
     if (msg.type === 'result') {
@@ -105,7 +108,15 @@ let running = false;
 
 function broadcast(obj) {
   const text = JSON.stringify(obj);
-  for (const ws of browserSockets) { if (ws.readyState === 1) ws.send(text); }
+  for (const ws of browserSockets) safeSend(ws, text);
+}
+
+/** 安全发送：连接可能在 await 期间关闭（ws v8 对非 OPEN socket 的 send 会同步 throw，
+ *  在 async message handler 里抛出会变成 unhandledRejection 并崩掉整个服务进程） */
+function safeSend(ws, text) {
+  try {
+    if (ws.readyState === 1) ws.send(text, () => { /* 发送错误由 ws 内部处理，忽略 */ });
+  } catch { /* 连接已死 */ }
 }
 
 const httpServer = createServer((req, res) => {
@@ -121,8 +132,8 @@ const browserWss = new WebSocketServer({ server: httpServer, path: '/ws' });
 browserWss.on('connection', (ws) => {
   browserSockets.add(ws);
   console.log('[gui] 浏览器已连接');
-  ws.send(JSON.stringify({ type: 'app_state', connected: !!appSocket, hello: appHello }));
-  ws.send(JSON.stringify({ type: 'dsl_help', text: DSL_HELP }));
+  safeSend(ws, JSON.stringify({ type: 'app_state', connected: !!appSocket, hello: appHello }));
+  safeSend(ws, JSON.stringify({ type: 'dsl_help', text: DSL_HELP }));
 
   ws.on('message', async (data) => {
     let msg; try { msg = JSON.parse(data.toString()); } catch { return; }
@@ -130,96 +141,104 @@ browserWss.on('connection', (ws) => {
       switch (msg.type) {
         case 'send': { // 手动下发一条指令
           const r = await sendToApp(msg.action, msg.params ?? {}, msg.timeout ?? 20);
-          ws.send(JSON.stringify({ type: 'result', action: msg.action, echo: msg.echo, ...pick(r) }));
+          safeSend(ws, JSON.stringify({ type: 'result', action: msg.action, echo: msg.echo, ...pick(r) }));
           break;
         }
         case 'record_stop': {
           const r = await sendToApp('record_stop');
-          ws.send(JSON.stringify({ type: 'record_result', ...pick(r), steps: r.data?.steps ?? [] }));
+          safeSend(ws, JSON.stringify({ type: 'record_result', ...pick(r), steps: r.data?.steps ?? [] }));
           break;
         }
         case 'record_save': { // 录制步骤（或当前编辑内容）保存为脚本
           const safe = String(msg.name || '').replace(/[^\w\u4e00-\u9fa5.-]/g, '_');
-          if (!safe) { ws.send(JSON.stringify({ type: 'rpc_error', error: '文件名无效' })); break; }
+          if (!safe) { safeSend(ws, JSON.stringify({ type: 'rpc_error', error: '文件名无效' })); break; }
           const file = join(SCRIPTS_DIR, safe.endsWith('.txt') ? safe : safe + '.txt');
           writeFileSync(file, String(msg.content ?? ''), 'utf8');
-          ws.send(JSON.stringify({ type: 'rpc_ok', message: `已保存 ${basename(file)}` }));
+          safeSend(ws, JSON.stringify({ type: 'rpc_ok', message: `已保存 ${basename(file)}` }));
           broadcast({ type: 'dsl_list', files: listScripts() });
           break;
         }
         case 'dsl_list':
-          ws.send(JSON.stringify({ type: 'dsl_list', files: listScripts() }));
+          safeSend(ws, JSON.stringify({ type: 'dsl_list', files: listScripts() }));
           break;
         case 'dsl_read': {
           const file = safeScriptPath(msg.name);
-          if (!file) { ws.send(JSON.stringify({ type: 'dsl_content', name: msg.name, error: '文件名无效', content: '' })); break; }
-          ws.send(JSON.stringify({ type: 'dsl_content', name: msg.name, content: readFileSync(file, 'utf8') }));
+          if (!file) { safeSend(ws, JSON.stringify({ type: 'dsl_content', name: msg.name, error: '文件名无效', content: '' })); break; }
+          safeSend(ws, JSON.stringify({ type: 'dsl_content', name: msg.name, content: readFileSync(file, 'utf8') }));
           break;
         }
         case 'dsl_delete': {
           const file = safeScriptPath(msg.name);
           if (file && existsSync(file)) unlinkSync(file);
-          ws.send(JSON.stringify({ type: 'rpc_ok', message: `已删除 ${msg.name}` }));
+          safeSend(ws, JSON.stringify({ type: 'rpc_ok', message: `已删除 ${msg.name}` }));
           broadcast({ type: 'dsl_list', files: listScripts() });
           break;
         }
         case 'dsl_steps_to_text': {
           // 录制步骤（JSON）→ DSL 文本（浏览器也可自己转，统一在服务端做）
-          ws.send(JSON.stringify({ type: 'dsl_text', text: stepsToDSL(msg.steps ?? []) }));
+          safeSend(ws, JSON.stringify({ type: 'dsl_text', text: stepsToDSL(msg.steps ?? []) }));
           break;
         }
         case 'run': {
-          if (running) { ws.send(JSON.stringify({ type: 'run_done', passed: 0, total: 0, ok: false, error: '已有脚本在运行' })); break; }
+          if (running) { safeSend(ws, JSON.stringify({ type: 'run_done', passed: 0, total: 0, ok: false, error: '已有脚本在运行' })); break; }
           let steps;
           try {
             steps = parseScript(String(msg.content ?? ''));
           } catch (e) {
-            ws.send(JSON.stringify({ type: 'run_done', passed: 0, total: 0, ok: false, error: `脚本解析失败: ${e.message}` }));
+            safeSend(ws, JSON.stringify({ type: 'run_done', passed: 0, total: 0, ok: false, error: `脚本解析失败: ${e.message}` }));
             break;
           }
           running = true;
-          const perfOn = !!msg.perf;
-          const xctraceOn = !!msg.xctrace;
-          broadcast({ type: 'run_start', total: steps.length, perf: perfOn, xctrace: xctraceOn });
+          try {
+            const perfOn = !!msg.perf;
+            const xctraceOn = !!msg.xctrace;
+            broadcast({ type: 'run_start', total: steps.length, perf: perfOn, xctrace: xctraceOn });
 
-          // App 端性能采样
-          if (perfOn) await sendToApp('perf_start', { interval: 0.5 });
-          // xctrace 宿主侧录制（环境受限自动降级，不阻塞测试）
-          let xctraceSession = null;
-          if (xctraceOn) {
-            const udid = await detectBootedSimulator();
-            if (udid) {
-              xctraceSession = startXctraceRecording({
-                deviceUDID: udid, processName: 'IUIAuto', template: 'Time Profiler',
-                outputDir: join(SCRIPTS_DIR, '..', 'traces'),
-              });
-              const ready = await xctraceSession.waitUntilRecording(30000);
-              if (!ready.ok) { xctraceSession.abort(); xctraceSession = null; broadcast({ type: 'app_log', level: 2, message: `xctrace 不可用已降级: ${ready.reason}` }); }
+            // App 端性能采样
+            if (perfOn) await sendToApp('perf_start', { interval: 0.5 });
+            // xctrace 宿主侧录制（环境受限自动降级，不阻塞测试）
+            let xctraceSession = null;
+            try {
+              if (xctraceOn) {
+                const udid = await detectBootedSimulator();
+                if (udid) {
+                  xctraceSession = startXctraceRecording({
+                    deviceUDID: udid, processName: 'IUIAuto', template: 'Time Profiler',
+                    outputDir: join(SCRIPTS_DIR, '..', 'traces'),
+                  });
+                  const ready = await xctraceSession.waitUntilRecording(30000);
+                  if (!ready.ok) { xctraceSession.abort(); xctraceSession = null; broadcast({ type: 'app_log', level: 2, message: `xctrace 不可用已降级: ${ready.reason}` }); }
+                }
+              }
+
+              const outcome = await runSteps(steps, sendToApp, (r) => broadcast({ type: 'run_progress', ...r }));
+
+              const perfData = perfOn ? ((await sendToApp('perf_stop')).data ?? null) : null;
+              let xctraceResult = null;
+              if (xctraceSession) xctraceResult = await xctraceSession.stop();
+
+              // 失败时抓现场截图推给浏览器
+              let failShot = null;
+              if (!outcome.ok) {
+                const s = await sendToApp('screenshot', { quality: 1 });
+                if (s.ok) failShot = `data:image/png;base64,${s.data.image}`;
+              }
+              broadcast({ type: 'run_done', passed: outcome.passed, total: outcome.total, ok: outcome.ok,
+                          failShot, perf: perfData, xctrace: xctraceResult });
+            } finally {
+              // 异常路径也必须停止 xctrace，避免孤儿录制进程
+              if (xctraceSession) { try { xctraceSession.abort(); } catch {} }
             }
+          } finally {
+            running = false;  // 任何异常都不得卡死运行标志
           }
-
-          const outcome = await runSteps(steps, sendToApp, (r) => broadcast({ type: 'run_progress', ...r }));
-          running = false;
-
-          const perfData = perfOn ? ((await sendToApp('perf_stop')).data ?? null) : null;
-          let xctraceResult = null;
-          if (xctraceSession) xctraceResult = await xctraceSession.stop();
-
-          // 失败时抓现场截图推给浏览器
-          let failShot = null;
-          if (!outcome.ok) {
-            const s = await sendToApp('screenshot', { quality: 1 });
-            if (s.ok) failShot = `data:image/png;base64,${s.data.image}`;
-          }
-          broadcast({ type: 'run_done', passed: outcome.passed, total: outcome.total, ok: outcome.ok,
-                      failShot, perf: perfData, xctrace: xctraceResult });
           break;
         }
         default:
           break;
       }
     } catch (e) {
-      ws.send(JSON.stringify({ type: 'rpc_error', error: e.message }));
+      safeSend(ws, JSON.stringify({ type: 'rpc_error', error: e.message }));
     }
   });
 

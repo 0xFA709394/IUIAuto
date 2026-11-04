@@ -217,9 +217,17 @@ static BOOL IUALoadPointFromIdentifier(NSString *identifier, CGPoint *outPoint, 
     });
 
     simple(@"double_tap", ^(IUACommand *cmd, void (^finish)(BOOL, NSDictionary *, NSString *)) {
+        // identifier 定位复用 tap 的全套保障（自动滚动到可视区 + 重试）
+        NSString *identifier = [cmd stringParam:@"identifier"];
+        if (identifier.length > 0) {
+            [self tapIdentifier:identifier tapCount:2 attempt:0 completion:^(BOOL ok, NSDictionary *data, NSString *error) {
+                finish(ok, ok ? @{@"doubleTapped" : @YES, @"x" : data[@"x"], @"y" : data[@"y"]} : nil, error);
+            }];
+            return;
+        }
         CGPoint point = CGPointZero;
         if (!IUALoadPoint(cmd.params, @"", @"x", @"y", &point)) {
-            finish(NO, nil, @"double_tap 需要 params.x/y");
+            finish(NO, nil, @"double_tap 需要 params.x/y 或 params.identifier");
             return;
         }
         [[IUATouchSynthesizer shared] tapAtPoint:point tapCount:2 completion:^(NSError * _Nullable error) {
@@ -387,11 +395,12 @@ static BOOL IUALoadPointFromIdentifier(NSString *identifier, CGPoint *outPoint, 
 /// 按 identifier 点击：元素不在可视区时先自动滚动到可见（沿祖先找 UIScrollView），
 /// 再执行触控；触控失败自动重试（等待滚动惯性/键盘动画结束）。
 - (void)tapIdentifier:(NSString *)identifier completion:(void (^)(BOOL, NSDictionary *, NSString *))finish {
-    [self tapIdentifier:identifier attempt:0 completion:finish];
+    [self tapIdentifier:identifier tapCount:1 attempt:0 completion:finish];
 }
 
 - (void)tapIdentifier:(NSString *)identifier
-               attempt:(NSUInteger)attempt
+               tapCount:(NSUInteger)tapCount
+                attempt:(NSUInteger)attempt
              completion:(void (^)(BOOL, NSDictionary *, NSString *))finish {
     UIView *view = [IUAViewIntrospector findViewWithIdentifier:identifier];
     if (!view || view.hidden || view.alpha < 0.01) {
@@ -403,16 +412,17 @@ static BOOL IUALoadPointFromIdentifier(NSString *identifier, CGPoint *outPoint, 
     UIWindow *window = view.window ?: [IUAViewIntrospector keyWindow];
     CGPoint point = [view convertPoint:CGPointMake(CGRectGetMidX(view.bounds), CGRectGetMidY(view.bounds))
                                 toView:window];
-    [[IUATouchSynthesizer shared] tapAtPoint:point tapCount:1 completion:^(NSError * _Nullable error) {
+    [[IUATouchSynthesizer shared] tapAtPoint:point tapCount:tapCount completion:^(NSError * _Nullable error) {
         if (!error) {
             finish(YES, @{@"x" : @(point.x), @"y" : @(point.y)}, nil);
             return;
         }
-        // 冷启动/布局未完成时元素 frame 可能暂无效，最多重试 6 次（约 3s）
-        if (attempt + 1 < 6) {
-            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)),
+        // 冷启动/布局未完成时元素 frame 可能暂无效（全冷启动实测首启可达 5s+），
+        // 最多重试 10 次（约 6s）
+        if (attempt + 1 < 10) {
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.6 * NSEC_PER_SEC)),
                            dispatch_get_main_queue(), ^{
-                [self tapIdentifier:identifier attempt:attempt + 1 completion:finish];
+                [self tapIdentifier:identifier tapCount:tapCount attempt:attempt + 1 completion:finish];
             });
             return;
         }

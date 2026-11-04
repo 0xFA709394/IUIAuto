@@ -22,6 +22,10 @@ const connectHint = setTimeout(() => {
 let flowStarted = false;
 wss.on('connection', (ws) => {
   clearTimeout(connectHint);
+  // 新连接顶替旧连接（App 重启/双进程场景）：关闭旧的，避免向死连接发送
+  if (socket && socket !== ws) { try { socket.close(); } catch {} }
+  socket = ws;
+  ws.on('close', () => { if (socket === ws) socket = null; });
   // App 启动初期的连接风暴（旧 client 断开+新 client 建立）不应让流程跑两遍
   if (flowStarted) {
     console.log('[record_test] 忽略重复连接（流程已在执行）');

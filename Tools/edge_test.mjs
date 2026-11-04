@@ -24,7 +24,9 @@ const send = (action, params = {}, timeoutSec = 12) => new Promise((resolve) => 
 
 let flowStarted = false;
 wss.on('connection', async (sock) => {
-  // 每次连接：替换 ws + 绑定消息处理（App 重连/重启后流程可继续通信）
+  // 每次连接：替换 ws + 绑定消息处理（App 重连/重启后流程可继续通信）；
+  // 主动关闭旧连接，避免向死连接发送
+  if (ws && ws !== sock) { try { ws.close(); } catch {} }
   ws = sock;
   clearTimeout(waitTimer);
   console.log('[edge_test] App 已连接' + (flowStarted ? '（重连，继续使用）' : '') + '\n');

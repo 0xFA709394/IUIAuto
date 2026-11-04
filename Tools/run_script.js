@@ -104,8 +104,11 @@ const connectHint = setTimeout(async () => {
   console.log('  · App 状态页显示的地址是否为本机 9800（卸载重装 App 可恢复默认）');
   console.log('  · 模拟器窗口失焦过久会冻结 App（App Nap）→ 点一下模拟器窗口或 open -a Simulator 唤醒\n');
 }, 15000);
+let flowStarted = false;
 wss.on('connection', (ws) => {
   clearTimeout(connectHint);
+  // 新连接顶替旧连接；主流程只跑一次（App 重连不得让脚本从头重跑）
+  if (socket && socket !== ws) { try { socket.close(); } catch {} }
   socket = ws;
   console.log('[run_script] App 已连接');
   ws.on('message', (data) => {
@@ -115,7 +118,9 @@ wss.on('connection', (ws) => {
       if (entry) { clearTimeout(entry.timer); pending.delete(msg.id); entry.resolve(msg); }
     }
   });
-  ws.on('close', () => { socket = null; if (!finished) console.log('[run_script] App 断开（等待重连…）'); });
+  ws.on('close', () => { if (socket === ws) socket = null; if (!finished) console.log('[run_script] App 断开（等待重连…）'); });
+  if (flowStarted) return;
+  flowStarted = true;
   setTimeout(() => recordFile ? runRecord() : runScript(), 600);
 });
 
@@ -212,7 +217,10 @@ async function runScript() {
 
 async function saveShot(file) {
   const r = await send('screenshot', { quality: 1 });
-  if (r.ok) { writeFileSync(file, Buffer.from(r.data.image, 'base64')); console.log(`  失败现场已截图 → ${file}`); }
+  if (r.ok) {
+    try { writeFileSync(file, Buffer.from(r.data.image, 'base64')); console.log(`  失败现场已截图 → ${file}`); }
+    catch (e) { console.log(`  失败现场截图保存失败: ${e.message}`); }
+  }
 }
 
 // ---------------------------------------------------------------- 录制模式
@@ -231,7 +239,7 @@ async function runRecord() {
   if (!stop.ok) { console.error('record_stop 失败:', stop.error); finish(1); return; }
   const steps = stop.data?.steps ?? [];
   const dsl = stepsToDSL(steps);
-  writeFileSync(recordFile, dsl);
+  try { writeFileSync(recordFile, dsl); } catch (e) { console.error(`脚本保存失败: ${e.message}`); finish(1); return; }
   console.log(`\n已录制 ${steps.length} 步，DSL 已保存 → ${recordFile}\n`);
   console.log(dsl);
   finish(0);

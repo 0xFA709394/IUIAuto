@@ -34,8 +34,14 @@ export async function runSteps(steps, send, onProgress = () => {}, opts = {}) {
       const r = await send('screenshot', step.params);
       pass = r.ok;
       if (r.ok && opts.shotSaver) {
-        await opts.shotSaver(step.file, r.data.image);
-        detail = `${Math.round(r.data.width)}x${Math.round(r.data.height)}`;
+        // 写盘异常（磁盘满/路径非法）不应中断整个脚本执行
+        try {
+          if (!r.data?.image) throw new Error('截图数据为空');
+          await opts.shotSaver(step.file, r.data.image);
+          detail = `${Math.round(r.data.width)}x${Math.round(r.data.height)}`;
+        } catch (e) {
+          detail = `截图数据获取成功但保存失败: ${e.message}`;
+        }
       } else if (!r.ok) {
         detail = r.error || '失败';
       }

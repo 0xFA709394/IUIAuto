@@ -71,8 +71,13 @@ export function parseScript(text) {
         }
         break;
       case 'dtap':
-        if (!isNumber(args[0]) || !isNumber(args[1])) throw new Error(`第 ${lineNo} 行: 双击 需要 x y`);
-        steps.push(action('double_tap', { x: +args[0], y: +args[1] }, lineNo));
+        if (isNumber(args[0])) {
+          if (!isNumber(args[1])) throw new Error(`第 ${lineNo} 行: 双击 坐标需要两个数字`);
+          steps.push(action('double_tap', { x: +args[0], y: +args[1] }, lineNo));
+        } else {
+          if (!args[0]) throw new Error(`第 ${lineNo} 行: 双击 需要 identifier 或 x y`);
+          steps.push(action('double_tap', { identifier: args[0] }, lineNo));
+        }
         break;
       case 'press': {
         if (isNumber(args[0])) {
@@ -88,8 +93,9 @@ export function parseScript(text) {
       case 'type': {
         if (args.length < 2) throw new Error(`第 ${lineNo} 行: 输入 需要 identifier 文本`);
         const identifier = args[0];
+        // 从 args[1] 起重组文本（indexOf 方案在 identifier 含特殊片段时可能错位）
         const text = rest.slice(rest.indexOf(identifier) + identifier.length).trim();
-        steps.push(action('type_text', { identifier, text }, lineNo));
+        steps.push(action('type_text', { identifier, text: text || args.slice(1).join(' ') }, lineNo));
         break;
       }
       case 'clear':
@@ -97,17 +103,20 @@ export function parseScript(text) {
         steps.push(action('clear_text', { identifier: args[0] }, lineNo));
         break;
       case 'swipe': {
-        const nums = args.filter(isNumber).map(Number);
-        if (nums.length < 4) throw new Error(`第 ${lineNo} 行: 滑动 需要 fromX fromY toX toY`);
-        const params = { fromX: nums[0], fromY: nums[1], toX: nums[2], toY: nums[3] };
-        if (nums[4]) params.duration = nums[4];
+        // 按位置校验（filter 方案会把非数字 token 静默挤掉导致坐标错位配对）
+        if (![0, 1, 2, 3].every((i) => isNumber(args[i]))) {
+          throw new Error(`第 ${lineNo} 行: 滑动 需要 fromX fromY toX toY 四个数字`);
+        }
+        const params = { fromX: +args[0], fromY: +args[1], toX: +args[2], toY: +args[3] };
+        if (isNumber(args[4])) params.duration = +args[4];
         steps.push(action('swipe', params, lineNo));
         break;
       }
       case 'pinch': {
-        const nums = args.filter(isNumber).map(Number);
-        if (nums.length < 4) throw new Error(`第 ${lineNo} 行: 捏合 需要 centerX centerY radiusFrom radiusTo`);
-        steps.push(action('pinch', { x: nums[0], y: nums[1], radiusFrom: nums[2], radiusTo: nums[3] }, lineNo));
+        if (![0, 1, 2, 3].every((i) => isNumber(args[i]))) {
+          throw new Error(`第 ${lineNo} 行: 捏合 需要 centerX centerY radiusFrom radiusTo 四个数字`);
+        }
+        steps.push(action('pinch', { x: +args[0], y: +args[1], radiusFrom: +args[2], radiusTo: +args[3] }, lineNo));
         break;
       }
       case 'wait': {
@@ -127,8 +136,15 @@ export function parseScript(text) {
         if (args.length < 3) throw new Error(`第 ${lineNo} 行: 断言文本 需要 identifier [包含|等于] 文本`);
         const identifier = args[0];
         const opWord = args[1];
-        const kind = opWord === '包含' || opWord === 'contains' ? 'text_contains' : 'text_equals';
-        const value = rest.slice(rest.indexOf(opWord) + opWord.length).trim();
+        const isContains = opWord === '包含' || opWord === 'contains';
+        const isEquals = opWord === '等于' || opWord === 'equals';
+        if (!isContains && !isEquals) {
+          throw new Error(`第 ${lineNo} 行: 断言文本 第二个参数须为 包含/等于（实际 "${opWord}"）`);
+        }
+        const kind = isContains ? 'text_contains' : 'text_equals';
+        // 安全提取：indexOf 未命中时回退为 args[2] 起重组，避免负索引错位截断
+        const at = rest.indexOf(opWord);
+        const value = at >= 0 ? rest.slice(at + opWord.length).trim() : args.slice(2).join(' ');
         steps.push(assert(kind, identifier, value, lineNo));
         break;
       }

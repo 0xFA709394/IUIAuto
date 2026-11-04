@@ -32,9 +32,17 @@ import { ensurePortFree, handleListenError, tryWakeApp } from './iua_ports.js';
 
 const PORT = process.env.PORT || 9800;
 const DEMO = process.argv.includes('--demo');
+if (process.argv.includes('--help') || process.argv.includes('-h')) {
+  console.log('用法: node mock_server.js [--demo] [--takeover] [--help]');
+  console.log('  --demo      App 连接后自动执行全流程验证（12 项断言）');
+  console.log('  --takeover  端口被旧实例占用时自动接管');
+  console.log('  交互模式指令: help 查看全部（tap/tapv/text/swipe/rec/shot/...）');
+  process.exit(0);
+}
 
 let socket = null;
 let seq = 0;
+let timeoutStreak = 0;  // 连续超时计数（检测模拟器病态：连接在但 App 无响应）
 let demoStarted = false;
 const pending = new Map(); // id -> {resolve, timer}
 
@@ -58,6 +66,10 @@ const connectHint = setTimeout(async () => {
 wss.on('connection', (ws, req) => {
   clearTimeout(connectHint);
   console.log(`[mock-server] App 已连接 (${req.socket.remoteAddress})`);
+  // 新连接顶替旧连接（App 重启/双进程竞态）：关闭旧的，避免向死连接发送
+  if (socket && socket !== ws) {
+    try { socket.close(); } catch {}
+  }
   socket = ws;
 
   ws.on('message', (data) => {
@@ -68,7 +80,9 @@ wss.on('connection', (ws, req) => {
 
   ws.on('close', () => {
     console.log('[mock-server] App 已断开');
-    socket = null;
+    if (socket === ws) {
+      socket = null;
+    }
   });
 
   ws.on('error', (e) => console.log('[mock-server] 连接错误:', e.message));
@@ -76,7 +90,7 @@ wss.on('connection', (ws, req) => {
   if (DEMO) {
     if (demoStarted) { console.log('[mock-server] 忽略重复触发的 demo'); return; }
     demoStarted = true;
-    setTimeout(runDemo, 1500);   // 给冷启动 App 的 UI 布局留余量
+    setTimeout(runDemo, 2500);   // 给冷启动 App 的 UI 布局留余量（全冷首启实测 5s+）
   } else {
     console.log('\n输入指令（help 查看示例）:');
   }
@@ -84,6 +98,7 @@ wss.on('connection', (ws, req) => {
 
 function onMessage(msg) {
   if (msg.type === 'result') {
+    timeoutStreak = 0;  // 收到响应说明链路健康
     const entry = pending.get(msg.id);
     if (entry) {
       clearTimeout(entry.timer);
@@ -124,6 +139,11 @@ function send(action, params = {}, timeoutSec = 15) {
     const timer = setTimeout(() => {
       pending.delete(id);
       resolve({ ok: false, error: `本地等待超时 ${timeoutSec}s` });
+      if (++timeoutStreak >= 3) {
+        console.log('\n⚠ 连续 3 次指令超时但连接仍在 —— 模拟器可能已进入异常状态（App 网络栈冻结）。');
+        console.log('  处理: 换一台模拟器，或执行 xcrun simctl shutdown <UDID> && xcrun simctl boot <UDID> 后重试\n');
+        timeoutStreak = 0;
+      }
     }, timeoutSec * 1000);
     pending.set(id, { resolve, timer });
     const payload = JSON.stringify({ id, action, params, timeout: timeoutSec });
@@ -168,7 +188,7 @@ rl.on('line', async (line) => {
             const steps = r.data.steps ?? [];
             const dsl = stepsToDSL(steps);
             const file = args[1] || 'recorded.txt';
-            writeFileSync(file, dsl);
+            try { writeFileSync(file, dsl); } catch (e) { console.log('保存失败: ' + e.message); break; }
             console.log(`已录制 ${steps.length} 步 → ${file}\n${dsl}`);
           } else { console.log(resultLine(r)); }
         } else {
@@ -185,7 +205,7 @@ rl.on('line', async (line) => {
       case 'shot': {
         const r = await send('screenshot', { quality: +(args[0] ?? 1) });
         if (r.ok) {
-          writeFileSync('shot.png', Buffer.from(r.data.image, 'base64'));
+          try { writeFileSync('shot.png', Buffer.from(r.data.image, 'base64')); } catch (e) { console.log('截图保存失败: ' + e.message); }
           console.log(`已保存 shot.png (${r.data.width}x${r.data.height}, ${(r.data.bytes / 1024).toFixed(0)}KB)`);
         } else { console.log(resultLine(r)); }
         break;
@@ -284,7 +304,7 @@ async function runDemo() {
   // 9. 截图
   const shot = await send('screenshot', { quality: 0 });
   if (shot.ok) {
-    writeFileSync('shot.png', Buffer.from(shot.data.image, 'base64'));
+    try { writeFileSync('shot.png', Buffer.from(shot.data.image, 'base64')); } catch (e) { console.log('截图保存失败: ' + e.message); }
     check('screenshot', shot.data.image.length > 1000, `${shot.data.width}x${shot.data.height}, ${(shot.data.bytes / 1024).toFixed(0)}KB → shot.png`);
   } else {
     check('screenshot', false, shot.error);

@@ -45,10 +45,13 @@ export function startXctraceRecording({ deviceUDID, processName = 'IUIAuto', tem
 
   let stderr = '', startedAt = Date.now();
   let outputSeen = false;
+  let spawnError = null;
   child.stdout.on('data', (d) => { if (/Starting recording/.test(String(d))) outputSeen = true; });
   child.stderr.on('data', (d) => { stderr += String(d); });
   let exited = false;
   child.on('exit', () => { exited = true; });
+  // spawn 失败（如 xcrun 不存在）若不监听 error 会以未处理异常崩掉整个工具进程
+  child.on('error', (e) => { spawnError = e; exited = true; });
 
   return {
     tracePath,
@@ -57,6 +60,7 @@ export function startXctraceRecording({ deviceUDID, processName = 'IUIAuto', tem
     async waitUntilRecording(timeoutMs = 30000) {
       const deadline = Date.now() + timeoutMs;
       while (Date.now() < deadline) {
+        if (spawnError) return { ok: false, reason: `xctrace 启动失败: ${spawnError.message}` };
         if (exited) return { ok: false, reason: reasonFromOutput(stderr, template) };
         if (outputSeen) return { ok: true };
         await sleep(500);
@@ -65,7 +69,11 @@ export function startXctraceRecording({ deviceUDID, processName = 'IUIAuto', tem
     },
     /** 停止录制：SIGINT → 等待退出 → 必要时 SIGKILL，返回结果与摘要 */
     async stop() {
+      if (spawnError) {
+        return { ok: false, tracePath: null, template, reason: `xctrace 启动失败: ${spawnError.message}`, elapsedSec: 0 };
+      }
       if (exited) {
+        await sleep(300);  // 等 stderr 流排干，避免降级原因因输出不完整而误判
         return finalize(tracePath, template, reasonFromOutput(stderr, template), Date.now() - startedAt);
       }
       // 优雅停止：Instruments CLI 收 SIGINT 后应保存 trace 退出

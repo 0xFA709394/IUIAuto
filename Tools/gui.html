@@ -285,8 +285,8 @@ function handle(msg) {
       break;
     case 'result':
       addManualResult(msg.action, msg.ok, msg.ok ? JSON.stringify(msg.data ?? {}).slice(0, 160) : msg.error);
-      if (msg.action === 'record_start') setRecUI(true);
-      break;
+        if (msg.action === 'record_start') setRecUI(msg.ok);
+        break;
     case 'record_result':
       setRecUI(false);
       if (msg.ok) {
@@ -364,6 +364,9 @@ async function refreshShot(quality) {
   if (reply.ok && reply.data?.image) {
     shotMeta = { width: reply.data.width, height: reply.data.height };
     shotImg.src = `data:image/png;base64,${reply.data.image}`;
+  } else {
+    // 失败可见（否则画面一直停留旧图，用户无从判断）
+    document.getElementById('shotHint').textContent = reply.error ? `截图失败: ${reply.error}` : '截图失败';
   }
 }
 
@@ -415,10 +418,17 @@ function rpc(payload) {
     const tag = 'rpc-' + Math.random();
     const onMsg = (ev) => {
       let m; try { m = JSON.parse(ev.data); } catch { return; }
-      if (m.echo === tag) { ws.removeEventListener('message', onMsg); resolve(m); }
+      if (m.echo === tag) { clearTimeout(timer); ws.removeEventListener('message', onMsg); resolve(m); }
     };
+    // 超时兜底：服务端未回显（断线/服务重启）时必须释放监听器并返回失败，
+    // 否则 Promise 永远 pending 且每次调用泄漏一个 message 监听器
+    const timer = setTimeout(() => {
+      ws.removeEventListener('message', onMsg);
+      resolve({ ok: false, error: '请求超时（服务无响应）' });
+    }, 30000);
     ws.addEventListener('message', onMsg);
-    ws.send(JSON.stringify({ ...payload, echo: tag }));
+    try { ws.send(JSON.stringify({ ...payload, echo: tag })); }
+    catch (e) { clearTimeout(timer); ws.removeEventListener('message', onMsg); resolve({ ok: false, error: '未连接' }); }
   });
 }
 
@@ -428,7 +438,11 @@ function manualTap() {
   else send({ type: 'send', action: 'tap', params: { x: num('tapX'), y: num('tapY') } });
   setTimeout(() => refreshShot(0), 500);
 }
-function manualDouble() { send({ type: 'send', action: 'double_tap', params: { x: num('tapX'), y: num('tapY') } }); }
+function manualDouble() {
+  // 与点击/长按一致：填了元素标识则按标识双击，否则按坐标
+  const id = val('tapId');
+  send({ type: 'send', action: 'double_tap', params: id ? { identifier: id } : { x: num('tapX'), y: num('tapY') } });
+}
 function manualPress() {
   const id = val('tapId');
   const params = id ? { identifier: id, duration: num('pressDur') } : { x: num('tapX'), y: num('tapY'), duration: num('pressDur') };
@@ -460,7 +474,10 @@ function setRecUI(recording) {
   document.getElementById('btnRecStart').disabled = recording;
   document.getElementById('btnRecStop').disabled = !recording;
 }
-function recStart() { send({ type: 'send', action: 'record_start' }); setRecUI(true); }
+function recStart() {
+  // UI 状态以指令结果为准（失败时不显示"录制中"，避免状态不同步）
+  send({ type: 'send', action: 'record_start' });
+}
 function recStop() { send({ type: 'record_stop' }); }
 function recCancel() { send({ type: 'send', action: 'record_cancel' }); setRecUI(false); }
 function recSave() {
@@ -526,7 +543,13 @@ function renderPerf(perf, xctrace) {
   const card = document.getElementById('perfCard');
   const tbody = document.querySelector('#perfTable tbody');
   tbody.innerHTML = '';
-  if (!perf || !perf.cpuPercent) { card.style.display = 'none'; }
+  if (!perf) { card.style.display = 'none'; }
+  else if (!perf.cpuPercent) {
+    // 开了性能监测但无有效样本（如极短脚本）：显示卡并说明，而非静默隐藏
+    card.style.display = 'block';
+    document.getElementById('perfMeta').textContent = `时长 ${perf.duration ?? '-'}s · ${perf.sampleCount ?? 0} 个采样点（无有效样本）`;
+    tbody.innerHTML = '<tr><td colspan="5" class="inline">采样窗口太短或无数据（App 刚启动/无帧活动）</td></tr>';
+  }
   else {
     card.style.display = 'block';
     document.getElementById('perfMeta').textContent = `时长 ${perf.duration}s · ${perf.sampleCount} 个采样点`;
