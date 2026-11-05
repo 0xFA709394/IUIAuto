@@ -33,12 +33,11 @@ Pod::Spec.new do |s|
 
   
   
-  # ✅ 必须：告诉 CocoaPods 不要强制 modular headers
+  # DEFINES_MODULE 保持默认 YES：宿主需要 @import IUIAUTO / #import <IUIAUTO/IUIAUTO.h>
+  # （module map 必须生成；早期为绕过非模块化 include 警告曾关闭，会导致 trunk 验证
+  #   与宿主 framework 集成时 Module not found，已回退为允许非模块化 include 的方式）
    s.pod_target_xcconfig = {
-     'DEFINES_MODULE' => 'NO',
-     'CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES' => 'YES',
-     'CLANG_ENABLE_MODULES' => 'NO'
-     # 注：不用在此设置 GCC_PREPROCESSOR_DEFINITIONS——会覆盖宿主工程自身的宏定义
+     'CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES' => 'YES'
    }
 
    
