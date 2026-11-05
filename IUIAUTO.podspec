@@ -22,17 +22,14 @@ Pod::Spec.new do |s|
   # 库源码 = Core（通信/调度/总控）+ Actions（触控合成/录制/文本/查询/截图/性能采样）
   # 不含 demo App 壳（App/UI/SupportingFiles）
   s.source_files = 'Sources/IUIAUTO.h', 'Sources/Core/**/*.{h,m}', 'Sources/Actions/**/*.{h,m}'
-  s.public_header_files =
-    'Sources/Core/IUAEngine.h',
-    'Sources/Core/IUAConfiguration.h',
-    'Sources/Core/IUALogger.h',
-    'Sources/Core/IUACommandDispatcher.h',
-    'Sources/Actions/IUATouchSynthesizer.h',
-    'Sources/Actions/IUARecorder.h',
-    'Sources/Actions/IUAPerfSampler.h',
-    'Sources/IUIAUTO.h'
+  # 全部头设为 public：public 头之间存在互引（如 IUACommandDispatcher.h → IUACommand.h），
+  # 任何被 public 头 import 的头若不在 public 列表，宿主在 framework 模式下展开伞头链时会报
+  # 'xxx.h' file not found。纯 OC 库统一全公开最稳妥。
+  s.public_header_files = 'Sources/**/*.h'
 
-  s.frameworks = 'UIKit', 'QuartzCore', 'Foundation'
+  # 显式声明全部依赖框架：pod_target 关闭了 modules（CLANG_ENABLE_MODULES=NO），
+  # auto-link 失效，CoreGraphics（CGRectGetMidX/Y 等）等必须显式链接，否则链接期符号未定义
+  s.frameworks = 'UIKit', 'QuartzCore', 'Foundation', 'CoreGraphics'
 
   
   
@@ -40,15 +37,13 @@ Pod::Spec.new do |s|
    s.pod_target_xcconfig = {
      'DEFINES_MODULE' => 'NO',
      'CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES' => 'YES',
-     'CLANG_ENABLE_MODULES' => 'NO',
-     # UITouch 私有 setter（触控合成核心）：仅可用于开发签名/内部自动化，不可上架 App Store
-     'GCC_PREPROCESSOR_DEFINITIONS' => 'IUIAUTO_POD=1'
+     'CLANG_ENABLE_MODULES' => 'NO'
+     # 注：不用在此设置 GCC_PREPROCESSOR_DEFINITIONS——会覆盖宿主工程自身的宏定义
    }
 
    
+   # 仅放开非模块化 include 检查；不再覆盖宿主的预处理器定义
    s.user_target_xcconfig = {
-     'CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES' => 'YES',
-     # UITouch 私有 setter（触控合成核心）：仅可用于开发签名/内部自动化，不可上架 App Store
-     'GCC_PREPROCESSOR_DEFINITIONS' => 'IUIAUTO_POD=1'
+     'CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES' => 'YES'
    }
 end

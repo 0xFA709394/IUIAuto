@@ -1,0 +1,22 @@
+name: IUIAutoExample
+options:
+  bundleIdPrefix: com.iuiauto
+  deploymentTarget:
+    iOS: "13.0"
+targets:
+  IUIAutoExample:
+    type: application
+    platform: iOS
+    sources: [IUIAutoExample]
+    info:
+      path: IUIAutoExample/Info.plist
+      properties:
+        CFBundleDisplayName: IUIAutoExample
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        NSAppTransportSecurity:
+          NSAllowsArbitraryLoads: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.iuiauto.example
+        GENERATE_INFOPLIST_FILE: NO

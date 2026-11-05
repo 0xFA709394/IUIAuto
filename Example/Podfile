@@ -1,0 +1,6 @@
+platform :ios, '13.0'
+
+target 'IUIAutoExample' do
+  use_frameworks! :linkage => :static
+  pod 'IUIAUTO', :path => '../'
+end
