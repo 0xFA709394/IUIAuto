@@ -5,8 +5,8 @@
 
 #import "AppDelegate.h"
 #import "DemoViewController.h"
-#import "IUAEngine.h"
-#import "IUALogger.h"
+#import <IUIAUTO/IUAEngine.h>
+#import <IUIAUTO/IUALogger.h>
 
 @interface AppDelegate ()
 /// 是否离开过前台（用于区分 launch 时的首次 didBecomeActive 与真正的回前台）

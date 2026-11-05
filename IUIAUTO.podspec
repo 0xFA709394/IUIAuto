@@ -18,22 +18,37 @@ Pod::Spec.new do |s|
 
   s.ios.deployment_target = '13.0'
   s.swift_version    = '5.0'   # 纯 OC，占位声明（部分 lint 工具需要）
-
+  
   # 库源码 = Core（通信/调度/总控）+ Actions（触控合成/录制/文本/查询/截图/性能采样）
   # 不含 demo App 壳（App/UI/SupportingFiles）
-  s.source_files = 'IUIAUTO.h', 'IUIAuto/Core/**/*.{h,m}', 'IUIAuto/Actions/**/*.{h,m}'
+  s.source_files = 'Sources/IUIAUTO.h', 'Sources/Core/**/*.{h,m}', 'Sources/Actions/**/*.{h,m}'
   s.public_header_files =
-    'IUIAuto/Core/IUAEngine.h',
-    'IUIAuto/Core/IUAConfiguration.h',
-    'IUIAuto/Core/IUACommandDispatcher.h',
-    'IUIAuto/Actions/IUATouchSynthesizer.h',
-    'IUIAuto/Actions/IUARecorder.h',
-    'IUIAuto/Actions/IUAPerfSampler.h',
-    'IUIAUTO.h'
+    'Sources/Core/IUAEngine.h',
+    'Sources/Core/IUAConfiguration.h',
+    'Sources/Core/IUALogger.h',
+    'Sources/Core/IUACommandDispatcher.h',
+    'Sources/Actions/IUATouchSynthesizer.h',
+    'Sources/Actions/IUARecorder.h',
+    'Sources/Actions/IUAPerfSampler.h',
+    'Sources/IUIAUTO.h'
 
   s.frameworks = 'UIKit', 'QuartzCore', 'Foundation'
 
-  # UITouch 私有 setter（触控合成核心）：仅可用于开发签名/内部自动化，不可上架 App Store
-  s.user_target_xcconfig = { 'GCC_PREPROCESSOR_DEFINITIONS' => 'IUIAUTO_POD=1' }
-  s.pod_target_xcconfig  = { 'GCC_PREPROCESSOR_DEFINITIONS' => 'IUIAUTO_POD=1' }
+  
+  
+  # ✅ 必须：告诉 CocoaPods 不要强制 modular headers
+   s.pod_target_xcconfig = {
+     'DEFINES_MODULE' => 'NO',
+     'CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES' => 'YES',
+     'CLANG_ENABLE_MODULES' => 'NO',
+     # UITouch 私有 setter（触控合成核心）：仅可用于开发签名/内部自动化，不可上架 App Store
+     'GCC_PREPROCESSOR_DEFINITIONS' => 'IUIAUTO_POD=1'
+   }
+
+   
+   s.user_target_xcconfig = {
+     'CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES' => 'YES',
+     # UITouch 私有 setter（触控合成核心）：仅可用于开发签名/内部自动化，不可上架 App Store
+     'GCC_PREPROCESSOR_DEFINITIONS' => 'IUIAUTO_POD=1'
+   }
 end

@@ -4,10 +4,11 @@
 //
 
 #import "DemoViewController.h"
-#import "IUAEngine.h"
-#import "IUAConfiguration.h"
-#import "IUARecorder.h"
-#import "IUALogger.h"
+
+#import <IUIAUTO/IUAEngine.h>
+#import <IUIAUTO/IUAConfiguration.h>
+#import <IUIAUTO/IUARecorder.h>
+#import <IUIAUTO/IUALogger.h>
 
 @interface DemoViewController ()
 @property (nonatomic, strong) UILabel *statusLabel;
