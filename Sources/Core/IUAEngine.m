@@ -34,6 +34,8 @@ SOFTWARE.
 #import "IUAScreenshotService.h"
 #import "IUARecorder.h"
 #import "IUAPerfSampler.h"
+#import "IUAFloatingStatusBar.h"
+#import "IUAConfigViewController.h"
 
 NSString *const IUAEngineConnectionDidChangeNotification = @"IUAEngineConnectionDidChangeNotification";
 
@@ -584,6 +586,31 @@ static BOOL IUALoadPointFromIdentifier(NSString *identifier, CGPoint *outPoint, 
         [[NSNotificationCenter defaultCenter] postNotificationName:IUAEngineConnectionDidChangeNotification
                                                             object:self
                                                           userInfo:@{@"connected" : @(connected)}];
+        // 悬浮状态条跟随连接状态（连接显示 / 断开隐藏）
+        [[IUAFloatingStatusBar sharedBar] setConnected:connected];
+    });
+}
+
+/// 便捷入口：从当前 keyWindow 的最顶层控制器模态打开服务端配置页
++ (void)presentConfigPage {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        UIWindow *window = nil;
+        for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
+            if ([scene isKindOfClass:[UIWindowScene class]]) {
+                UIWindowScene *ws = (UIWindowScene *)scene;
+                if (ws.keyWindow) { window = ws.keyWindow; break; }
+            }
+        }
+        UIViewController *top = window.rootViewController;
+        while (top.presentedViewController && ![top.presentedViewController isBeingDismissed]) {
+            top = top.presentedViewController;
+        }
+        if ([top isKindOfClass:[IUAConfigViewController class]]) {
+            return;   // 已打开
+        }
+        UINavigationController *nav = [[UINavigationController alloc]
+                                       initWithRootViewController:[[IUAConfigViewController alloc] init]];
+        [top presentViewController:nav animated:YES completion:nil];
     });
 }
 

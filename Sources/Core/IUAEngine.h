@@ -58,6 +58,9 @@ extern NSString *const IUAEngineConnectionDidChangeNotification;
 /// 已注册的动作列表
 @property (nonatomic, readonly) NSArray<NSString *> *registeredActions;
 
+/// 便捷入口：从当前 keyWindow 顶层控制器模态打开「调试服务端配置页」
++ (void)presentConfigPage;
+
 @end
 
 NS_ASSUME_NONNULL_END

@@ -34,6 +34,10 @@ SOFTWARE.
 
 NS_ASSUME_NONNULL_BEGIN
 
+/// 指令执行忙碌状态变化通知（userInfo: { @"busy": NSNumber }）——
+/// busy=YES 表示自动化指令正在执行（悬浮状态条"执行自动化中"信号源）
+extern NSString *const IUACommandDispatcherBusyDidChangeNotification;
+
 /// 动作处理器：执行完毕必须调用 complete（恰好一次），否则由超时兜底
 typedef void (^IUAActionHandler)(IUACommand *command,
                                  void (^complete)(BOOL ok, NSDictionary<NSString *, id> * _Nullable data,

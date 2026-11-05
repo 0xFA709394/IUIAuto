@@ -54,6 +54,14 @@ SOFTWARE.
     return [self.handlers.allKeys sortedArrayUsingSelector:@selector(compare:)];
 }
 
+NSString *const IUACommandDispatcherBusyDidChangeNotification = @"IUACommandDispatcherBusyDidChangeNotification";
+
+- (void)postBusyChange:(BOOL)busy {
+    [[NSNotificationCenter defaultCenter] postNotificationName:IUACommandDispatcherBusyDidChangeNotification
+                                                        object:self
+                                                      userInfo:@{@"busy" : @(busy)}];
+}
+
 - (void)dispatchCommand:(IUACommand *)command completion:(void (^)(IUACommandResult *result))completion {
     dispatch_async(dispatch_get_main_queue(), ^{
         [self.pendingCommands addObject:command];
@@ -90,6 +98,7 @@ SOFTWARE.
     }
 
     self.executing = YES;
+    [self postBusyChange:YES];
     CFAbsoluteTime start = CFAbsoluteTimeGetCurrent();
 
     // 先到先得：超时 guard 与真实完成竞争，仅一方生效
@@ -112,6 +121,7 @@ SOFTWARE.
 
         __strong typeof(weakSelf) strongSelf = weakSelf;
         strongSelf.executing = NO;
+        [strongSelf postBusyChange:NO];
         [strongSelf drainOnMainThread];
     };
 

@@ -24,6 +24,8 @@
 #import "IUALogger.h"
 #import "IUAWebSocketClient.h"
 #import "IUIAUTO.h"
+#import "IUAConfigViewController.h"
+#import "IUAFloatingStatusBar.h"
 
 FOUNDATION_EXPORT double IUIAUTOVersionNumber;
 FOUNDATION_EXPORT const unsigned char IUIAUTOVersionString[];

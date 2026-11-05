@@ -1,16 +1,16 @@
 PODS:
-  - IUIAUTO (0.1.1)
+  - IUIAUTO (0.1.2)
 
 DEPENDENCIES:
-  - IUIAUTO (from `../`)
+  - IUIAUTO (from `../IUIAUTO.podspec`)
 
 EXTERNAL SOURCES:
   IUIAUTO:
-    :path: "../"
+    :path: "../IUIAUTO.podspec"
 
 SPEC CHECKSUMS:
-  IUIAUTO: 01cd53c0c8875d3cdeedbebb0c353ff1ace45cd8
+  IUIAUTO: 580d2302e50ce7fcbd85d3abbd39780ea9b0f92e
 
-PODFILE CHECKSUM: d250e1e8e8edc4677db7d130c1b14f9a4dd3fa6b
+PODFILE CHECKSUM: e5dd0eb3604ebab40591737fa428b2d177b41f4b
 
 COCOAPODS: 1.17.0

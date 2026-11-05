@@ -37,5 +37,9 @@
 #import "IUARecorder.h"
 #import "IUAPerfSampler.h"
 
+// 调试服务端配置页与悬浮状态条（UI 组件，按需使用）
+#import "IUAConfigViewController.h"
+#import "IUAFloatingStatusBar.h"
+
 FOUNDATION_EXPORT double IUIAUTOVersionNumber;
 FOUNDATION_EXPORT const unsigned char IUIAUTOVersionString[];

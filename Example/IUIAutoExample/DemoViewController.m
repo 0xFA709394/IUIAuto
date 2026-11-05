@@ -142,7 +142,26 @@
     [self.connectButton setContentHuggingPriority:UILayoutPriorityRequired forAxis:UILayoutConstraintAxisHorizontal];
     [self.connectButton.widthAnchor constraintEqualToConstant:72].active = YES;
 
-    return [self cardViewWithTitle:@"控制服务器" subviews:@[row]];
+    // 卡片标题行右侧加"连接设置"入口（打开完整配置页）
+    UIButton *settingsButton = [UIButton buttonWithType:UIButtonTypeSystem];
+    [settingsButton setTitle:@"连接设置 ▸" forState:UIControlStateNormal];
+    settingsButton.accessibilityIdentifier = @"btn.settings";
+    settingsButton.titleLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightSemibold];
+    [settingsButton addTarget:self action:@selector(settingsTapped) forControlEvents:UIControlEventTouchUpInside];
+
+    UIStackView *titleRow = [[UIStackView alloc] init];
+    titleRow.axis = UILayoutConstraintAxisHorizontal;
+    titleRow.distribution = UIStackViewDistributionFill;
+    titleRow.spacing = 4;
+    UILabel *titleLabel = [[UILabel alloc] init];
+    titleLabel.text = @"控制服务器";
+    titleLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightSemibold];
+    titleLabel.textColor = [UIColor tertiaryLabelColor];
+    [titleRow addArrangedSubview:titleLabel];
+    [titleRow addArrangedSubview:[[UIView alloc] init]];   // 撑开
+    [titleRow addArrangedSubview:settingsButton];
+
+    return [self cardViewWithTitle:nil customTitleView:titleRow subviews:@[row]];
 }
 
 - (UIView *)counterSection {
@@ -250,6 +269,12 @@
 }
 
 - (UIView *)cardViewWithTitle:(NSString * _Nullable)title subviews:(NSArray<UIView *> *)subviews {
+    return [self cardViewWithTitle:title customTitleView:nil subviews:subviews];
+}
+
+- (UIView *)cardViewWithTitle:(NSString * _Nullable)title
+               customTitleView:(nullable UIView *)customTitle
+                    subviews:(NSArray<UIView *> *)subviews {
     UIStackView *container = [[UIStackView alloc] init];
     container.axis = UILayoutConstraintAxisVertical;
     container.spacing = 10;
@@ -258,7 +283,9 @@
     container.backgroundColor = UIColor.whiteColor;
     container.layer.cornerRadius = 12;
 
-    if (title.length > 0) {
+    if (customTitle) {
+        [container addArrangedSubview:customTitle];
+    } else if (title.length > 0) {
         UILabel *titleLabel = [[UILabel alloc] init];
         titleLabel.text = title;
         titleLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightSemibold];
@@ -303,6 +330,10 @@
 
 - (void)sliderChanged:(UISlider *)slider {
     self.sliderLabel.text = [NSString stringWithFormat:@"value: %.0f", slider.value];
+}
+
+- (void)settingsTapped {
+    [IUAEngine presentConfigPage];
 }
 
 - (void)connectTapped {
