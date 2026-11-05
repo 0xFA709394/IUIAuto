@@ -23,8 +23,17 @@ SOFTWARE.
  */
 
 //
-//  文本输入合成：走 UIResponder<UIKeyInput> 公开协议（insertText:/deleteBackward:）
-//  与真实键盘输入同路径，会正常触发 delegate 校验与 UIControl 编辑事件
+//  文本输入合成（高版本 iOS 健壮版）
+//
+//  主路径与真实键盘同源（UIResponder<UIKeyInput> 的 insertText:），
+//  并针对高版本 iOS（16+）真机时序做了多层保障：
+//    1. becomeFirstResponder 失败自动重试（等待视图 layout 完成，最多 ~1.5s）
+//    2. 成为 responder 后等待键盘/输入会话激活再插入
+//    3. 插入后回读校验；未生效（delegate 拦截/输入法 marked text 干扰）时
+//       降级为直接设置 text 属性 + 补发编辑事件
+//    4. 焦点始终拿不到时直接走直赋兜底，不再报"无法成为 firstResponder"
+//
+//  全部接口异步完成（completion 在主线程回调）。
 //
 
 #import <UIKit/UIKit.h>
@@ -35,12 +44,13 @@ NS_ASSUME_NONNULL_BEGIN
 
 /// 向指定输入框输入文本。
 /// identifier 为空时输入到当前 firstResponder；文本中 \n 表示回车。
-/// 返回 nil 表示成功，否则为错误描述。
-+ (nullable NSError *)typeText:(NSString *)text
-          intoViewWithIdentifier:(nullable NSString *)identifier;
+- (void)typeText:(NSString *)text
+    intoViewWithIdentifier:(nullable NSString *)identifier
+                completion:(void (^)(NSError * _Nullable error))completion;
 
-/// 清空指定输入框（deleteBackward 逐字符删除，与真实退格同路径）
-+ (nullable NSError *)clearTextInViewWithIdentifier:(nullable NSString *)identifier;
+/// 清空指定输入框。
+- (void)clearTextInViewWithIdentifier:(nullable NSString *)identifier
+                           completion:(void (^)(NSError * _Nullable error))completion;
 
 @end
 

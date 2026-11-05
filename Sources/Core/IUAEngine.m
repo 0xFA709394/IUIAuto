@@ -40,6 +40,26 @@ NSString *const IUAEngineConnectionDidChangeNotification = @"IUAEngineConnection
 static NSString *const IUAActionErrorDomain = @"IUAActionErrorDomain";
 
 /// 从 params 中解析点坐标：{"x":..,"y":..} 顶层或 {"from":{"x","y"}} 形式
+/// 当前 firstResponder 探测：sendAction:to:nil 会沿响应链路由到 firstResponder
+static UIResponder *gIUAEngineCapturedFR = nil;
+
+@interface UIResponder (IUAEngineFRProbe)
+- (void)iua_engineCaptureFR:(id)sender;
+@end
+
+@implementation UIResponder (IUAEngineFRProbe)
+- (void)iua_engineCaptureFR:(id)sender {
+    gIUAEngineCapturedFR = self;
+}
+@end
+
+static UIResponder *IUACurrentFirstResponderForInput(void) {
+    gIUAEngineCapturedFR = nil;
+    [UIApplication.sharedApplication sendAction:@selector(iua_engineCaptureFR:)
+                                             to:nil from:nil forEvent:nil];
+    return gIUAEngineCapturedFR;
+}
+
 /// NSNumber 直接可用；NSString 必须能完整解析为数值（"12.5" ✓ "abc"/"12x" ✗）
 static BOOL IUAIsNumeric(id value) {
     if ([value isKindOfClass:[NSNumber class]]) return YES;
@@ -269,6 +289,13 @@ static BOOL IUALoadPointFromIdentifier(NSString *identifier, CGPoint *outPoint, 
         CGPoint point = CGPointZero;
         NSString *identifier = [cmd stringParam:@"identifier"];
         if (identifier.length > 0) {
+            // 与 tap/double_tap 同款：元素可能滚出可视区，先自动滚动到可见
+            UIView *view = [IUAViewIntrospector findViewWithIdentifier:identifier];
+            if (!view || view.hidden || view.alpha < 0.01) {
+                finish(NO, nil, [NSString stringWithFormat:@"找不到可见的 view: identifier=%@", identifier]);
+                return;
+            }
+            [self ensureViewVisible:view];
             NSString *errorText = nil;
             if (!IUALoadPointFromIdentifier(identifier, &point, &errorText)) {
                 finish(NO, nil, errorText);
@@ -322,15 +349,19 @@ static BOOL IUALoadPointFromIdentifier(NSString *identifier, CGPoint *outPoint, 
             return;
         }
         NSString *identifier = [cmd stringParam:@"identifier"];
-        NSError *error = [IUATextSynthesizer typeText:text intoViewWithIdentifier:identifier];
-        error ? finish(NO, nil, error.localizedDescription)
-              : finish(YES, @{@"typed" : @(text.length)}, nil);
+        IUATextSynthesizer *synthesizer = [[IUATextSynthesizer alloc] init];
+        [synthesizer typeText:text intoViewWithIdentifier:identifier completion:^(NSError * _Nullable error) {
+            error ? finish(NO, nil, error.localizedDescription)
+                  : finish(YES, @{@"typed" : @(text.length)}, nil);
+        }];
     });
 
     simple(@"clear_text", ^(IUACommand *cmd, void (^finish)(BOOL, NSDictionary *, NSString *)) {
         NSString *identifier = [cmd stringParam:@"identifier"];
-        NSError *error = [IUATextSynthesizer clearTextInViewWithIdentifier:identifier];
-        error ? finish(NO, nil, error.localizedDescription) : finish(YES, @{}, nil);
+        IUATextSynthesizer *synthesizer = [[IUATextSynthesizer alloc] init];
+        [synthesizer clearTextInViewWithIdentifier:identifier completion:^(NSError * _Nullable error) {
+            error ? finish(NO, nil, error.localizedDescription) : finish(YES, @{}, nil);
+        }];
     });
 
     simple(@"view_tree", ^(IUACommand *cmd, void (^finish)(BOOL, NSDictionary *, NSString *)) {
@@ -413,6 +444,56 @@ static BOOL IUALoadPointFromIdentifier(NSString *identifier, CGPoint *outPoint, 
         finish(YES, [IUAPerfSampler instantSample], nil);
     });
 
+    // ---- 按键：回车/删除/退格/任意字符（不依赖系统键盘 UI 是否显示）----
+    simple(@"press_key", ^(IUACommand *cmd, void (^finish)(BOOL, NSDictionary *, NSString *)) {
+        NSString *key = [[cmd stringParam:@"key"] lowercaseString];
+        NSString *identifier = [cmd stringParam:@"identifier"];
+        // 目标输入框：显式 identifier，或当前 firstResponder
+        UIResponder<UIKeyInput> *input = nil;
+        if (identifier.length > 0) {
+            UIView *view = [IUAViewIntrospector findViewWithIdentifier:identifier];
+            if ([view isKindOfClass:[UIResponder class]] && [view conformsToProtocol:@protocol(UIKeyInput)]) {
+                input = (UIResponder<UIKeyInput> *)view;
+                [input becomeFirstResponder];
+            }
+        } else {
+            UIResponder *first = IUACurrentFirstResponderForInput();
+            if ([first conformsToProtocol:@protocol(UIKeyInput)]) {
+                input = (UIResponder<UIKeyInput> *)first;
+            }
+        }
+        if (!input) {
+            finish(NO, nil, @"没有可接收按键的输入框（先用 输入 指令或点击输入框获得焦点，或传 identifier）");
+            return;
+        }
+
+        if ([key isEqualToString:@"return"] || [key isEqualToString:@"enter"] || [key isEqualToString:@"回车"]) {
+            // UITextField 的 didEndOnExit 链路：endEditing 触发 return 回调
+            [input insertText:@"\n"];
+            if ([input isKindOfClass:[UITextField class]]) {
+                UITextField *field = (UITextField *)input;
+                [field sendActionsForControlEvents:UIControlEventEditingDidEndOnExit];
+            }
+            finish(YES, @{@"key" : @"return"}, nil);
+            return;
+        }
+        if ([key isEqualToString:@"delete"] || [key isEqualToString:@"backspace"] || [key isEqualToString:@"删除"] || [key isEqualToString:@"退格"]) {
+            if ([input hasText]) {
+                [input deleteBackward];
+                finish(YES, @{@"key" : @"delete"}, nil);
+            } else {
+                finish(YES, @{@"key" : @"delete", @"note" : @"输入框已为空"}, nil);
+            }
+            return;
+        }
+        if (key.length > 0) {
+            [input insertText:[cmd stringParam:@"key"]];   // 原始大小写插入首字符
+            finish(YES, @{@"key" : key}, nil);
+            return;
+        }
+        finish(NO, nil, @"press_key 需要 params.key（return/delete/回车/删除/任意字符）");
+    });
+
     simple(@"dismiss_keyboard", ^(IUACommand *cmd, void (^finish)(BOOL, NSDictionary *, NSString *)) {
         UIWindow *window = [IUAViewIntrospector keyWindow];
         BOOL resigned = [window endEditing:YES];
@@ -434,6 +515,12 @@ static BOOL IUALoadPointFromIdentifier(NSString *identifier, CGPoint *outPoint, 
              completion:(void (^)(BOOL, NSDictionary *, NSString *))finish {
     UIView *view = [IUAViewIntrospector findViewWithIdentifier:identifier];
     if (!view || view.hidden || view.alpha < 0.01) {
+        // 系统键盘按键（identifier 形如 UIKeyboardLayout*）需要软件键盘真实显示才存在：
+        // 模拟器的键盘渲染进程常驻占位（iOS 17+ 已知限制），此时给出专属指引
+        if ([identifier hasPrefix:@"UIKeyboard"]) {
+            finish(NO, nil, [NSString stringWithFormat:@"找不到 %@：系统键盘按键要求软件键盘真实显示（模拟器键盘进程常不渲染；真机可用）。若目的是输入内容，请改用 type_text（含 \n 回车）或 press_key 指令，二者均不依赖键盘 UI", identifier]);
+            return;
+        }
         finish(NO, nil, [NSString stringWithFormat:@"找不到可见的 view: identifier=%@", identifier]);
         return;
     }

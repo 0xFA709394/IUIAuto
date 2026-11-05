@@ -29,6 +29,7 @@ const ALIASES = {
   '捏合': 'pinch', 'pinch': 'pinch',
   '等待': 'wait', 'wait': 'wait', 'sleep': 'wait',
   '收起键盘': 'keyboard', '收键盘': 'keyboard', 'dismiss': 'keyboard', 'keyboard': 'keyboard',
+  '按键': 'key', 'key': 'key', 'keypress': 'key',
   '截图': 'shot', 'shot': 'shot', 'screenshot': 'shot',
   '断言文本': 'atext', 'assert-text': 'atext', 'asserttext': 'atext',
   '断言存在': 'aexists', 'assert-exists': 'aexists', 'assertexists': 'aexists',
@@ -162,6 +163,24 @@ export function parseScript(text) {
       case 'keyboard':
         emit(action('dismiss_keyboard', {}, lineNo));
         break;
+      case 'key': {
+        // 按键 回车/删除/A/任意字符（不依赖系统键盘 UI 是否显示）
+        const alias = { '回车': 'return', 'enter': 'return', 'return': 'return',
+                        '删除': 'delete', '退格': 'delete', 'delete': 'delete', 'backspace': 'delete' };
+        const k = args[0];
+        if (!k) throw new Error(`第 ${lineNo} 行: 按键 需要 回车/删除/任意字符`);
+        emit(action('press_key', { key: alias[k.toLowerCase()] || k, identifier: args[1] || undefined }, lineNo));
+        break;
+      }
+      case 'key': {
+        // 按键 回车/删除/A/任意字符（不依赖系统键盘 UI 是否显示）
+        const alias = { '回车': 'return', 'enter': 'return', 'return': 'return',
+                        '删除': 'delete', '退格': 'delete', 'delete': 'delete', 'backspace': 'delete' };
+        const k = args[0];
+        if (!k) throw new Error(`第 ${lineNo} 行: 按键 需要 回车/删除/任意字符`);
+        emit(action('press_key', { key: alias[k.toLowerCase()] || k, identifier: args[1] || undefined }, lineNo));
+        break;
+      }
       case 'shot': {
         const params = { quality: 1 };
         emit({ type: 'shot', file: args[0] || 'shot.png', params, line: lineNo });
