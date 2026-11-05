@@ -8,6 +8,8 @@ iOS 自动化操作项目的 iOS 端：一个纯 Objective-C App，作为常驻 
 - ✅ **录制回放**：真机手工操作一遍，自动生成可读脚本（`Tools/run_script.js --record`）
 - ✅ **中文 DSL 脚本 + 断言**：业务测试人员无需手写 JSON（`点击 btn.counter` / `断言文本 label.counter 包含 Count: 2`）
 - ✅ **性能监测**：脚本运行期间自动采样 App CPU/内存/FPS 并输出报告摘要；可同步调用 **xctrace** 录制 `.trace`（真机全模板可用）
+- 📖 **完整操作参考见 [使用手册.md](使用手册.md)**（GUI 详解 / DSL 全表 / 指令协议 / CocoaPods 集成）
+- 📦 iOS 库已封装为 CocoaPods pod（`IUIAUTO.podspec`，已通过 lib lint）——宿主 App 三行代码接入
 - ⚠️ 合成触控仅作用于**本 App 进程内**（非越狱 iOS 的沙箱限制，无法跨 App）
 
 ## 工作原理
@@ -188,7 +190,8 @@ node run_script.js 用例1.txt
 | 清空 id | clear | `清空 field.input` |
 | 滑动 fx fy tx ty [秒] | swipe | `滑动 200 600 200 300 0.4` |
 | 捏合 cx cy r1 r2 | pinch | `捏合 200 400 150 30` |
-| 等待 秒 | wait | `等待 1` |
+| 等待 秒 | wait | `等待 1`（队列等待，不卡 App UI） |
+| 循环 N … 结束循环 | loop | `循环 5` / `结束循环`（块内重复 5 次，可嵌套，上限 100） |
 | 截图 [文件] | shot | `截图 demo.png` |
 | 断言文本 id 包含/等于 文本 | assert-text | `断言文本 label.counter 包含 Count: 2` |
 | 断言存在 id | assert-exists | `断言存在 btn.submit` |

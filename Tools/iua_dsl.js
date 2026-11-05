@@ -41,11 +41,16 @@ const isNumber = (s) => s !== '' && !isNaN(+s);
  * 解析脚本文本为步骤数组。每个步骤：
  *   { type:'action', action, params, line }        → 下发给 App
  *   { type:'assert', kind, identifier, value, line } → 本地断言
+ * 支持块语法：`循环 N` … `结束循环`（编译期展开为重复步骤，N 上限 100）
  * 解析失败时 throw Error（含行号）。
  */
 export function parseScript(text) {
   const steps = [];
+  const loopStack = [];  // { count, bodyStart: steps.length 快照用数组 }
+  const loopBodies = []; // 与 loopStack 平行：每层循环体的独立步骤数组
   const lines = text.split('\n');
+  const MAX_LOOP = 100;
+
   lines.forEach((raw, i) => {
     const lineNo = i + 1;
     const line = raw.replace(/#.*$/, '').trim(); // 去注释
@@ -54,39 +59,69 @@ export function parseScript(text) {
     const cmdWord = (sp === -1 ? line : line.slice(0, sp)).toLowerCase();
     const rest = sp === -1 ? '' : line.slice(sp + 1).trim();
     const args = rest.split(/\s+/).filter(Boolean);
+
+    // ---- 循环块语法（在别名表之前处理）----
+    if (cmdWord === '循环' || cmdWord === 'loop' || cmdWord === 'repeat') {
+      const count = parseInt(args[0], 10);
+      if (!Number.isInteger(count) || count < 1) {
+        throw new Error(`第 ${lineNo} 行: 循环 需要正整数次数（如: 循环 3）`);
+      }
+      if (count > MAX_LOOP) {
+        throw new Error(`第 ${lineNo} 行: 循环次数 ${count} 超过上限 ${MAX_LOOP}（防误写死循环）`);
+      }
+      loopStack.push({ count, line: lineNo });
+      loopBodies.push([]);
+      return;
+    }
+    if (cmdWord === '结束循环' || cmdWord === 'endloop' || cmdWord === 'end-loop') {
+      const frame = loopStack.pop();
+      if (!frame) {
+        throw new Error(`第 ${lineNo} 行: 结束循环 没有匹配的 循环 开始`);
+      }
+      const body = loopBodies.pop();
+      const target = loopBodies.length > 0 ? loopBodies[loopBodies.length - 1] : steps;
+      for (let n = 0; n < frame.count; n++) {
+        for (const s of body) target.push(s);
+      }
+      return;
+    }
+
+    // 步骤路由：循环体内进入当前循环体数组，否则进入顶层步骤
+    const emit = (s) => (loopBodies.length ? loopBodies[loopBodies.length - 1].push(s) : steps.push(s));
+
     const canonical = ALIASES[cmdWord];
     if (!canonical) throw new Error(`第 ${lineNo} 行: 未知命令 "${cmdWord}"`);
 
     switch (canonical) {
       case 'ping':
-        steps.push(action('ping', {}, lineNo));
+        emit(action('ping', {}, lineNo));
         break;
       case 'tap':
         if (!args.length) throw new Error(`第 ${lineNo} 行: 点击 需要 identifier 或 x y`);
         if (isNumber(args[0])) {
           if (!isNumber(args[1])) throw new Error(`第 ${lineNo} 行: 点击 坐标需要两个数字`);
-          steps.push(action('tap', { x: +args[0], y: +args[1] }, lineNo));
+          emit(action('tap', { x: +args[0], y: +args[1] }, lineNo));
         } else {
-          steps.push(action('tap_view', { identifier: args[0] }, lineNo));
+          emit(action('tap_view', { identifier: args[0] }, lineNo));
         }
         break;
       case 'dtap':
         if (isNumber(args[0])) {
           if (!isNumber(args[1])) throw new Error(`第 ${lineNo} 行: 双击 坐标需要两个数字`);
-          steps.push(action('double_tap', { x: +args[0], y: +args[1] }, lineNo));
+          emit(action('double_tap', { x: +args[0], y: +args[1] }, lineNo));
         } else {
           if (!args[0]) throw new Error(`第 ${lineNo} 行: 双击 需要 identifier 或 x y`);
-          steps.push(action('double_tap', { identifier: args[0] }, lineNo));
+          emit(action('double_tap', { identifier: args[0] }, lineNo));
         }
         break;
       case 'press': {
         if (isNumber(args[0])) {
           if (!isNumber(args[1])) throw new Error(`第 ${lineNo} 行: 长按 坐标需要两个数字`);
           const dur = isNumber(args[2]) ? +args[2] : 0.8;
-          steps.push(action('long_press', { x: +args[0], y: +args[1], duration: dur }, lineNo));
+          emit(action('long_press', { x: +args[0], y: +args[1], duration: dur }, lineNo));
         } else {
           const dur = isNumber(args[1]) ? +args[1] : 0.8;
-          steps.push(action('long_press', { identifier: args[0], duration: dur }, lineNo));
+          emit(action('long_press', { identifier: args[0], duration: dur }, lineNo));
         }
         break;
       }
@@ -95,12 +130,12 @@ export function parseScript(text) {
         const identifier = args[0];
         // 从 args[1] 起重组文本（indexOf 方案在 identifier 含特殊片段时可能错位）
         const text = rest.slice(rest.indexOf(identifier) + identifier.length).trim();
-        steps.push(action('type_text', { identifier, text: text || args.slice(1).join(' ') }, lineNo));
+        emit(action('type_text', { identifier, text: text || args.slice(1).join(' ') }, lineNo));
         break;
       }
       case 'clear':
         if (!args.length) throw new Error(`第 ${lineNo} 行: 清空 需要 identifier`);
-        steps.push(action('clear_text', { identifier: args[0] }, lineNo));
+        emit(action('clear_text', { identifier: args[0] }, lineNo));
         break;
       case 'swipe': {
         // 按位置校验（filter 方案会把非数字 token 静默挤掉导致坐标错位配对）
@@ -109,27 +144,27 @@ export function parseScript(text) {
         }
         const params = { fromX: +args[0], fromY: +args[1], toX: +args[2], toY: +args[3] };
         if (isNumber(args[4])) params.duration = +args[4];
-        steps.push(action('swipe', params, lineNo));
+        emit(action('swipe', params, lineNo));
         break;
       }
       case 'pinch': {
         if (![0, 1, 2, 3].every((i) => isNumber(args[i]))) {
           throw new Error(`第 ${lineNo} 行: 捏合 需要 centerX centerY radiusFrom radiusTo 四个数字`);
         }
-        steps.push(action('pinch', { x: +args[0], y: +args[1], radiusFrom: +args[2], radiusTo: +args[3] }, lineNo));
+        emit(action('pinch', { x: +args[0], y: +args[1], radiusFrom: +args[2], radiusTo: +args[3] }, lineNo));
         break;
       }
       case 'wait': {
         const sec = +args[0] || 1;
-        steps.push(action('wait', { seconds: Math.min(sec, 60) }, lineNo));
+        emit(action('wait', { seconds: Math.min(sec, 60) }, lineNo));
         break;
       }
       case 'keyboard':
-        steps.push(action('dismiss_keyboard', {}, lineNo));
+        emit(action('dismiss_keyboard', {}, lineNo));
         break;
       case 'shot': {
         const params = { quality: 1 };
-        steps.push({ type: 'shot', file: args[0] || 'shot.png', params, line: lineNo });
+        emit({ type: 'shot', file: args[0] || 'shot.png', params, line: lineNo });
         break;
       }
       case 'atext': {
@@ -145,19 +180,22 @@ export function parseScript(text) {
         // 安全提取：indexOf 未命中时回退为 args[2] 起重组，避免负索引错位截断
         const at = rest.indexOf(opWord);
         const value = at >= 0 ? rest.slice(at + opWord.length).trim() : args.slice(2).join(' ');
-        steps.push(assert(kind, identifier, value, lineNo));
+        emit(assert(kind, identifier, value, lineNo));
         break;
       }
       case 'aexists':
         if (!args[0]) throw new Error(`第 ${lineNo} 行: 断言存在 需要 identifier`);
-        steps.push(assert('exists', args[0], null, lineNo));
+        emit(assert('exists', args[0], null, lineNo));
         break;
       case 'amissing':
         if (!args[0]) throw new Error(`第 ${lineNo} 行: 断言不存在 需要 identifier`);
-        steps.push(assert('missing', args[0], null, lineNo));
+        emit(assert('missing', args[0], null, lineNo));
         break;
     }
   });
+  if (loopStack.length > 0) {
+    throw new Error(`第 ${loopStack[loopStack.length - 1].line} 行: 循环 未闭合（缺少 结束循环）`);
+  }
   return steps;
 
   function action(name, params, line) { return { type: 'action', action: name, params, line }; }
@@ -201,5 +239,6 @@ export const DSL_HELP = `支持的命令（# 为注释）:
   输入 id 文本            清空 id
   滑动 fx fy tx ty [秒]   捏合 cx cy r1 r2
   等待 秒                 截图 [文件名]
+  循环 N ... 结束循环     （块内步骤重复 N 次，上限 100）
   断言文本 id 包含|等于 文本
   断言存在 id             断言不存在 id`;
