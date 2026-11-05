@@ -29,6 +29,12 @@ fi
 echo "▸ 生成 Xcode 工程…"
 xcodegen generate >/dev/null
 
+# xcodegen 重建工程会覆盖 workspace，需要重新执行 pod install 恢复 Pods 集成
+if [ -f Podfile ]; then
+  echo "▸ 检测到 Podfile，执行 pod install…"
+  pod install >/dev/null
+fi
+
 # ---- 选择模拟器（默认第一个 booted；否则 boot 第一台 iPhone）----
 UDID="${1:-}"
 if [ "$UDID" = "--boot-only" ] || [ -z "$UDID" ]; then
@@ -50,9 +56,15 @@ if [ "${1:-}" = "--boot-only" ]; then exit 0; fi
 
 # ---- 编译（模拟器，免签名）----
 echo "▸ 编译 IUIAuto（模拟器）…"
-xcodebuild -project IUIAuto.xcodeproj -scheme IUIAuto \
-  -sdk iphonesimulator -destination "platform=iOS Simulator,id=$UDID" \
-  -quiet build
+if [ -d IUIAuto.xcworkspace ]; then
+  xcodebuild -workspace IUIAuto.xcworkspace -scheme IUIAuto \
+    -sdk iphonesimulator -destination "platform=iOS Simulator,id=$UDID" \
+    -quiet build
+else
+  xcodebuild -project IUIAuto.xcodeproj -scheme IUIAuto \
+    -sdk iphonesimulator -destination "platform=iOS Simulator,id=$UDID" \
+    -quiet build
+fi
 
 # ---- 定位产物并安装启动 ----
 APP=$(find ~/Library/Developer/Xcode/DerivedData/IUIAuto-*/Build/Products/Debug-iphonesimulator -maxdepth 1 -name "IUIAuto.app" 2>/dev/null | head -1)

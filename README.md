@@ -183,6 +183,7 @@ node run_script.js 用例1.txt
 |---|---|---|
 | 探活 | ping | `探活` |
 | 收起键盘 | dismiss | `收起键盘` |
+| 按键 回车/删除/字符 | key | `按键 回车`（不依赖键盘 UI 显示） |
 | 点击 id 或 x y | tap | `点击 btn.counter` / `点击 201 314` |
 | 双击 x y | dtap | `双击 201 314` |
 | 长按 id或x y [秒] | press | `长按 btn.submit 1.0` |
@@ -288,3 +289,29 @@ tap/长按/滑动按位移(≥14pt)与时长(≥0.45s)自动判定；输入通�
 - Xcode 26.6 / iOS 26.5 模拟器（iPhone 17 Pro）
 - 指令链路端到端断言 12/12 通过：identifier 点击、坐标点击、计数联动、中文输入、提交联动、滑动滚动、截图、view 树导出
 - 录制回放闭环 6/6 通过：合成操作录制（tap×2/type_text/swipe 步骤数与内容精确校验）→ DSL 生成 → 回放 + 断言（`Count: 4` 验证录制与回放双向生效）
+
+## Licenses
+
+```
+MIT License
+
+Copyright (c) 2011-Present 0xFA709394
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```

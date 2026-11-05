@@ -1,0 +1,16 @@
+PODS:
+  - IUIAUTO (0.1.1)
+
+DEPENDENCIES:
+  - IUIAUTO (from `../`)
+
+EXTERNAL SOURCES:
+  IUIAUTO:
+    :path: "../"
+
+SPEC CHECKSUMS:
+  IUIAUTO: 01cd53c0c8875d3cdeedbebb0c353ff1ace45cd8
+
+PODFILE CHECKSUM: d250e1e8e8edc4677db7d130c1b14f9a4dd3fa6b
+
+COCOAPODS: 1.17.0

@@ -1,0 +1,6 @@
+framework module IUIAUTO {
+  umbrella header "IUIAUTO-umbrella.h"
+
+  export *
+  module * { export * }
+}

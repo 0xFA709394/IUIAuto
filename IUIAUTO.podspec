@@ -1,6 +1,6 @@
 Pod::Spec.new do |s|
   s.name             = 'IUIAUTO'
-  s.version          = '0.1.1'
+  s.version          = '0.1.2'
   s.summary          = 'IUIAuto — iOS UI 自动化 Agent（进程内触控合成，不依赖 XCUITest）'
   s.description      = <<-DESC
     通过 WebSocket 长连接接收控制服务器下发的 JSON 指令，在宿主 App 进程内
@@ -18,22 +18,32 @@ Pod::Spec.new do |s|
 
   s.ios.deployment_target = '13.0'
   s.swift_version    = '5.0'   # 纯 OC，占位声明（部分 lint 工具需要）
-
+  
   # 库源码 = Core（通信/调度/总控）+ Actions（触控合成/录制/文本/查询/截图/性能采样）
   # 不含 demo App 壳（App/UI/SupportingFiles）
-  s.source_files = 'IUIAUTO.h', 'IUIAuto/Core/**/*.{h,m}', 'IUIAuto/Actions/**/*.{h,m}'
-  s.public_header_files =
-    'IUIAuto/Core/IUAEngine.h',
-    'IUIAuto/Core/IUAConfiguration.h',
-    'IUIAuto/Core/IUACommandDispatcher.h',
-    'IUIAuto/Actions/IUATouchSynthesizer.h',
-    'IUIAuto/Actions/IUARecorder.h',
-    'IUIAuto/Actions/IUAPerfSampler.h',
-    'IUIAUTO.h'
+  s.source_files = 'Sources/IUIAUTO.h', 'Sources/Core/**/*.{h,m}', 'Sources/Actions/**/*.{h,m}'
+  # 全部头设为 public：public 头之间存在互引（如 IUACommandDispatcher.h → IUACommand.h），
+  # 任何被 public 头 import 的头若不在 public 列表，宿主在 framework 模式下展开伞头链时会报
+  # 'xxx.h' file not found。纯 OC 库统一全公开最稳妥。
+  s.public_header_files = 'Sources/**/*.h'
 
-  s.frameworks = 'UIKit', 'QuartzCore', 'Foundation'
+  # 显式声明全部依赖框架：pod_target 关闭了 modules（CLANG_ENABLE_MODULES=NO），
+  # auto-link 失效，CoreGraphics（CGRectGetMidX/Y 等）等必须显式链接，否则链接期符号未定义
+  s.frameworks = 'UIKit', 'QuartzCore', 'Foundation', 'CoreGraphics'
 
-  # UITouch 私有 setter（触控合成核心）：仅可用于开发签名/内部自动化，不可上架 App Store
-  s.user_target_xcconfig = { 'GCC_PREPROCESSOR_DEFINITIONS' => 'IUIAUTO_POD=1' }
-  s.pod_target_xcconfig  = { 'GCC_PREPROCESSOR_DEFINITIONS' => 'IUIAUTO_POD=1' }
+  
+  
+  # ✅ 必须：告诉 CocoaPods 不要强制 modular headers
+   s.pod_target_xcconfig = {
+     'DEFINES_MODULE' => 'NO',
+     'CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES' => 'YES',
+     'CLANG_ENABLE_MODULES' => 'NO'
+     # 注：不用在此设置 GCC_PREPROCESSOR_DEFINITIONS——会覆盖宿主工程自身的宏定义
+   }
+
+   
+   # 仅放开非模块化 include 检查；不再覆盖宿主的预处理器定义
+   s.user_target_xcconfig = {
+     'CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES' => 'YES'
+   }
 end
