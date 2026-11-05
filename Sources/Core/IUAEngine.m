@@ -596,10 +596,19 @@ static BOOL IUALoadPointFromIdentifier(NSString *identifier, CGPoint *outPoint, 
     dispatch_async(dispatch_get_main_queue(), ^{
         UIWindow *window = nil;
         for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
-            if ([scene isKindOfClass:[UIWindowScene class]]) {
-                UIWindowScene *ws = (UIWindowScene *)scene;
+            if (![scene isKindOfClass:[UIWindowScene class]]) {
+                continue;
+            }
+            UIWindowScene *ws = (UIWindowScene *)scene;
+            if (@available(iOS 15.0, *)) {
                 if (ws.keyWindow) { window = ws.keyWindow; break; }
             }
+            for (UIWindow *w in ws.windows) {
+                if (w.isKeyWindow && ![w isKindOfClass:NSClassFromString(@"UITextEffectsWindow")]) {
+                    window = w; break;
+                }
+            }
+            if (window) { break; }
         }
         UIViewController *top = window.rootViewController;
         while (top.presentedViewController && ![top.presentedViewController isBeingDismissed]) {

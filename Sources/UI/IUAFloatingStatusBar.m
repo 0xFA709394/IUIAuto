@@ -109,8 +109,6 @@ static CGFloat const kIUABarHPadding = 15.0f;
         [self buildBarInView:window];
     }
 
-    BOOL connected = [IUAEngine sharedEngine].isConnected;
-
     // 内容
     self.label.text = self.busy ? @"IUIAuto 执行自动化中" : @"IUIAuto 已连接";
     [self.label sizeToFit];
@@ -237,14 +235,28 @@ static CGFloat const kIUABarHPadding = 15.0f;
 
 - (UIWindow *)hostWindow {
     for (UIScene *scene in [UIApplication sharedApplication].connectedScenes) {
-        if ([scene isKindOfClass:[UIWindowScene class]]) {
-            UIWindowScene *ws = (UIWindowScene *)scene;
+        if (![scene isKindOfClass:[UIWindowScene class]]) {
+            continue;
+        }
+        UIWindowScene *ws = (UIWindowScene *)scene;
+        if (@available(iOS 15.0, *)) {
             if (ws.keyWindow) {
                 return ws.keyWindow;
             }
         }
+        // iOS 13/14 回退：取第一个可成为 key 的主窗口
+        for (UIWindow *w in ws.windows) {
+            if (w.isKeyWindow && ![self isSystemOverlayWindow:w]) {
+                return w;
+            }
+        }
     }
     return nil;
+}
+
+- (BOOL)isSystemOverlayWindow:(UIWindow *)window {
+    return [window isKindOfClass:NSClassFromString(@"UITextEffectsWindow")] ||
+           [window isKindOfClass:NSClassFromString(@"UICallBarWindow")];
 }
 
 - (void)setEnabled:(BOOL)enabled {
