@@ -114,6 +114,18 @@
     self.infoLabel.numberOfLines = 0;
     [stack addArrangedSubview:self.infoLabel];
 
+    // 完成按钮（普通 UIButton，可被 tap_view 定位；UIBarButtonItem 不在 view 树无法自动化）
+    UIButton *doneButton = [UIButton buttonWithType:UIButtonTypeSystem];
+    doneButton.accessibilityIdentifier = @"btn.config.done";
+    [doneButton setTitle:@"完成" forState:UIControlStateNormal];
+    doneButton.titleLabel.font = [UIFont systemFontOfSize:16 weight:UIFontWeightBold];
+    doneButton.backgroundColor = [UIColor systemGray5Color];
+    doneButton.tintColor = [UIColor labelColor];
+    doneButton.layer.cornerRadius = 8;
+    [doneButton.heightAnchor constraintGreaterThanOrEqualToConstant:44].active = YES;
+    [doneButton addTarget:self action:@selector(doneTapped) forControlEvents:UIControlEventTouchUpInside];
+    [stack addArrangedSubview:doneButton];
+
     // 说明
     UILabel *hint = [[UILabel alloc] init];
     hint.font = [UIFont systemFontOfSize:13];
@@ -154,6 +166,10 @@
 }
 
 #pragma mark - 事件
+
+- (void)doneTapped {
+    [self dismissViewControllerAnimated:YES completion:nil];
+}
 
 - (void)actionTapped {
     if ([IUAEngine sharedEngine].isConnected) {

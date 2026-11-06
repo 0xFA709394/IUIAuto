@@ -489,8 +489,14 @@ static BOOL IUALoadPointFromIdentifier(NSString *identifier, CGPoint *outPoint, 
             return;
         }
         if (key.length > 0) {
-            [input insertText:[cmd stringParam:@"key"]];   // 原始大小写插入首字符
-            finish(YES, @{@"key" : key}, nil);
+            // 「按键」语义 = 一次一键：只插入首个完整字符簇（emoji 等多字节组合不被截断）
+            NSString *raw = [cmd stringParam:@"key"];
+            NSRange first = [raw rangeOfComposedCharacterSequencesForRange:NSMakeRange(0, 0)];
+            if (first.length == 0) {
+                first = NSMakeRange(0, 1);
+            }
+            [input insertText:[raw substringWithRange:first]];
+            finish(YES, @{@"key" : key, @"inserted" : [raw substringWithRange:first]}, nil);
             return;
         }
         finish(NO, nil, @"press_key 需要 params.key（return/delete/回车/删除/任意字符）");
@@ -531,6 +537,18 @@ static BOOL IUALoadPointFromIdentifier(NSString *identifier, CGPoint *outPoint, 
     UIWindow *window = view.window ?: [IUAViewIntrospector keyWindow];
     CGPoint point = [view convertPoint:CGPointMake(CGRectGetMidX(view.bounds), CGRectGetMidY(view.bounds))
                                 toView:window];
+    // 遮挡校验：hitTest 命中的必须是目标自身或其子视图（否则点击会落在遮挡层上
+    // 却仍报成功——静默点错，比失败更危险）
+    UIView *hit = [window hitTest:point withEvent:nil];
+    BOOL hitIsTargetOrChild = NO;
+    for (UIView *probe = hit; probe; probe = probe.superview) {
+        if (probe == view) { hitIsTargetOrChild = YES; break; }
+    }
+    if (!hitIsTargetOrChild) {
+        finish(NO, nil, [NSString stringWithFormat:@"目标 %@ 被遮挡（命中 %@），请先关闭覆盖层（如配置页/弹窗）",
+                         identifier, NSStringFromClass(hit.class)]);
+        return;
+    }
     [[IUATouchSynthesizer shared] tapAtPoint:point tapCount:tapCount completion:^(NSError * _Nullable error) {
         if (!error) {
             finish(YES, @{@"x" : @(point.x), @"y" : @(point.y)}, nil);
