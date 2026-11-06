@@ -18,10 +18,10 @@ gui:
 	@./start.sh
 
 demo:
-	@cd Tools && node mock_server.js --demo
+	@cd Tools && node mock_server.js --takeover --demo
 
 test:
-	@cd Tools && node mock_server.js --demo && node record_test.mjs && \
+	@cd Tools && node mock_server.js --takeover --demo && node record_test.mjs && \
 	 printf 'ping\n点击 btn.counter\n断言存在 btn.counter\n' > /tmp/mk_check.txt && \
 	 node run_script.js --takeover /tmp/mk_check.txt
 

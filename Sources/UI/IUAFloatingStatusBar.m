@@ -79,6 +79,19 @@ static CGFloat const kIUABarHPadding = 15.0f;
     }
 }
 
+- (void)yieldForInteraction {
+    if (!self.barView) {
+        return;   // 本就未显示
+    }
+    [UIView animateWithDuration:0.12 animations:^{ self.barView.alpha = 0.0f; }];
+    __weak typeof(self) weakSelf = self;
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.6 * NSEC_PER_SEC)),
+                   dispatch_get_main_queue(), ^{
+        __strong typeof(weakSelf) strongSelf = weakSelf;
+        [strongSelf refresh];
+    });
+}
+
 #pragma mark - 显示/隐藏
 
 - (void)hideBar {

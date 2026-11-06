@@ -303,6 +303,19 @@ static BOOL IUALoadPointFromIdentifier(NSString *identifier, CGPoint *outPoint, 
                 finish(NO, nil, errorText);
                 return;
             }
+            [[IUAFloatingStatusBar sharedBar] yieldForInteraction];   // 防悬浮条遮挡
+            // 遮挡校验（与 tapIdentifier 同款，防止点击落在遮挡层却报成功）
+            UIWindow *window = view.window ?: [IUAViewIntrospector keyWindow];
+            UIView *hit = [window hitTest:point withEvent:nil];
+            BOOL hitIsTargetOrChild = NO;
+            for (UIView *probe = hit; probe; probe = probe.superview) {
+                if (probe == view) { hitIsTargetOrChild = YES; break; }
+            }
+            if (!hitIsTargetOrChild) {
+                finish(NO, nil, [NSString stringWithFormat:@"目标 %@ 被遮挡（命中 %@），请先关闭覆盖层（如配置页/弹窗）",
+                                 identifier, NSStringFromClass(hit.class)]);
+                return;
+            }
         } else if (!IUALoadPoint(cmd.params, @"", @"x", @"y", &point)) {
             finish(NO, nil, @"long_press 需要 params.x/y 或 params.identifier");
             return;
@@ -521,6 +534,10 @@ static BOOL IUALoadPointFromIdentifier(NSString *identifier, CGPoint *outPoint, 
                tapCount:(NSUInteger)tapCount
                 attempt:(NSUInteger)attempt
              completion:(void (^)(BOOL, NSDictionary *, NSString *))finish {
+    if (attempt == 0) {
+        // 悬浮条避让：防止它遮挡点击目标（顶部区域元素）
+        [[IUAFloatingStatusBar sharedBar] yieldForInteraction];
+    }
     UIView *view = [IUAViewIntrospector findViewWithIdentifier:identifier];
     if (!view || view.hidden || view.alpha < 0.01) {
         // 系统键盘按键（identifier 形如 UIKeyboardLayout*）需要软件键盘真实显示才存在：
@@ -538,13 +555,21 @@ static BOOL IUALoadPointFromIdentifier(NSString *identifier, CGPoint *outPoint, 
     CGPoint point = [view convertPoint:CGPointMake(CGRectGetMidX(view.bounds), CGRectGetMidY(view.bounds))
                                 toView:window];
     // 遮挡校验：hitTest 命中的必须是目标自身或其子视图（否则点击会落在遮挡层上
-    // 却仍报成功——静默点错，比失败更危险）
+    // 却仍报成功——静默点错，比失败更危险）。
+    // 滚动/转场动画进行中会瞬时遮挡 → 纳入重试；重试耗尽仍遮挡才报错
     UIView *hit = [window hitTest:point withEvent:nil];
     BOOL hitIsTargetOrChild = NO;
     for (UIView *probe = hit; probe; probe = probe.superview) {
         if (probe == view) { hitIsTargetOrChild = YES; break; }
     }
     if (!hitIsTargetOrChild) {
+        if (attempt + 1 < 10) {
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.4 * NSEC_PER_SEC)),
+                           dispatch_get_main_queue(), ^{
+                [self tapIdentifier:identifier tapCount:tapCount attempt:attempt + 1 completion:finish];
+            });
+            return;
+        }
         finish(NO, nil, [NSString stringWithFormat:@"目标 %@ 被遮挡（命中 %@），请先关闭覆盖层（如配置页/弹窗）",
                          identifier, NSStringFromClass(hit.class)]);
         return;

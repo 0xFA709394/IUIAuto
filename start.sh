@@ -45,7 +45,7 @@ step "检查 App"
 if [ -z "$BOOTED" ]; then
   echo "  无运行中的模拟器，跳过 App 检查"
 else
-  INSTALLED=$(xcrun simctl get_app_container "$BOOTED" com.iuiauto.agent 2>/dev/null || true)
+  INSTALLED=$(xcrun simctl get_app_container "$BOOTED" com.iuiauto.example 2>/dev/null || true)
   if [ -z "$INSTALLED" ]; then
     echo "  App 未安装，开始构建安装（首次约 1-2 分钟）…"
     ./build.sh "$BOOTED"
@@ -54,7 +54,7 @@ else
     RUNNING=$(xcrun simctl spawn "$BOOTED" launchctl list 2>/dev/null | grep -c iuiauto || true)
     if [ "${RUNNING:-0}" -eq 0 ] 2>/dev/null; then
       echo "  App 未运行，启动中…"
-      xcrun simctl launch "$BOOTED" com.iuiauto.agent >/dev/null
+      xcrun simctl launch "$BOOTED" com.iuiauto.example >/dev/null
     else
       echo "  App 运行中（若模拟器窗口长时间失焦 App 可能被冻结，点一下窗口唤醒）"
     fi

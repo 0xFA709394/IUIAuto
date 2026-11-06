@@ -27,6 +27,10 @@ NS_ASSUME_NONNULL_BEGIN
 /// 立即刷新显示状态（一般无需手动调用）
 - (void)refresh;
 
+/// 交互避让：触控指令执行前调用——短暂隐藏悬浮条避免遮挡点击目标，
+/// 0.6s 后按连接状态自动恢复（用户视觉几乎无感）
+- (void)yieldForInteraction;
+
 /// 连接状态驱动（由 IUAEngine 自动调用：YES 显示悬浮条 / NO 隐藏）
 - (void)setConnected:(BOOL)connected;
 
