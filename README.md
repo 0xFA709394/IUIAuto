@@ -192,6 +192,11 @@ node run_script.js 用例1.txt
 | 滑动 fx fy tx ty [秒] | swipe | `滑动 200 600 200 300 0.4` |
 | 捏合 cx cy r1 r2 | pinch | `捏合 200 400 150 30` |
 | 等待 秒 | wait | `等待 1`（队列等待，不卡 App UI） |
+| 等待出现 <标识> [秒] | wait_for | `等待出现 btn.submit 8`（轮询至出现，默认 10s） |
+| 等待消失 <标识> [秒] | wait_for | `等待消失 loading 5` |
+| 上滑/下滑/左滑/右滑 [pt] [起点] | swipe | `上滑 400`、`下滑 300 btn.counter` |
+| 滚动到 <标识> | scroll_to | `滚动到 label.row.12` |
+| 断言值 <标识> 包含/等于 值 | assert-value | `断言值 slider.demo 等于 50`（slider/switch 值） |
 | 循环 N … 结束循环 | loop | `循环 5` / `结束循环`（块内重复 5 次，可嵌套，上限 100） |
 | 截图 [文件] | shot | `截图 demo.png` |
 | 断言文本 id 包含/等于 文本 | assert-text | `断言文本 label.counter 包含 Count: 2` |

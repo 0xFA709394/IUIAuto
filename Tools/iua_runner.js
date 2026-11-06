@@ -79,6 +79,12 @@ async function runAssert(step, send) {
   }
   const r = await send('element_info', { identifier });
   if (!r.ok) return { pass: false, detail: '元素不存在' };
+  if (kind === 'value_equals' || kind === 'value_contains') {
+    // 控件值断言（UISlider/UISwitch 等的 value 字段）
+    const v = String(r.data?.value ?? '');
+    const pass = kind === 'value_equals' ? v === String(value) : v.includes(String(value));
+    return { pass, detail: `实际值="${v}" 期望="${value}"` };
+  }
   const text = r.data?.text ?? '';
   return kind === 'text_contains'
     ? { pass: text.includes(value), detail: `实际="${text}"` }

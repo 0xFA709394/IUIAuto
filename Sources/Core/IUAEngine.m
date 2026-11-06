@@ -327,11 +327,53 @@ static BOOL IUALoadPointFromIdentifier(NSString *identifier, CGPoint *outPoint, 
     });
 
     simple(@"swipe", ^(IUACommand *cmd, void (^finish)(BOOL, NSDictionary *, NSString *)) {
+        // 方向语义：direction=up/down/left/right + distance(pt，默认300) + 可选 originIdentifier（起手元素）
+        NSString *direction = [cmd stringParam:@"direction"];
+        if (direction.length > 0) {
+            UIWindow *window = [IUAViewIntrospector keyWindow];
+            if (!window) {
+                finish(NO, nil, @"swipe: 没有 keyWindow");
+                return;
+            }
+            CGFloat distance = [cmd floatParam:@"distance" default:300];
+            CGPoint origin = CGPointMake(window.bounds.size.width / 2, window.bounds.size.height / 2);
+            NSString *originId = [cmd stringParam:@"originIdentifier"];
+            if (originId.length > 0) {
+                UIView *view = [IUAViewIntrospector findViewWithIdentifier:originId];
+                if (!view) {
+                    finish(NO, nil, [NSString stringWithFormat:@"swipe: 起点元素不存在: %@", originId]);
+                    return;
+                }
+                origin = [view convertPoint:CGPointMake(CGRectGetMidX(view.bounds), CGRectGetMidY(view.bounds))
+                                     toView:window];
+            }
+            CGPoint target = origin;
+            NSString *d = direction.lowercaseString;
+            if ([d isEqualToString:@"up"] || [d isEqualToString:@"上"]) {
+                target.y = origin.y - distance;
+            } else if ([d isEqualToString:@"down"] || [d isEqualToString:@"下"]) {
+                target.y = origin.y + distance;
+            } else if ([d isEqualToString:@"left"] || [d isEqualToString:@"左"]) {
+                target.x = origin.x - distance;
+            } else if ([d isEqualToString:@"right"] || [d isEqualToString:@"右"]) {
+                target.x = origin.x + distance;
+            } else {
+                finish(NO, nil, @"swipe: direction 须为 up/down/left/right");
+                return;
+            }
+            [[IUATouchSynthesizer shared] swipeFromPoint:origin toPoint:target
+                                                duration:[cmd floatParam:@"duration" default:0.4]
+                                              completion:^(NSError * _Nullable error) {
+                error ? finish(NO, nil, error.localizedDescription)
+                      : finish(YES, @{@"direction" : d, @"distance" : @(distance)}, nil);
+            }];
+            return;
+        }
         CGPoint from = CGPointZero, to = CGPointZero;
         BOOL okFrom = IUALoadPoint(cmd.params, @"from", @"fromX", @"fromY", &from);
         BOOL okTo = IUALoadPoint(cmd.params, @"to", @"toX", @"toY", &to);
         if (!okFrom || !okTo) {
-            finish(NO, nil, @"swipe 需要 params.fromX/fromY/toX/toY（或 from:{x,y}/to:{x,y}）");
+            finish(NO, nil, @"swipe 需要 params.fromX/fromY/toX/toY（或 direction=up/down/left/right）");
             return;
         }
         double duration = [cmd floatParam:@"duration" default:0.3];
@@ -457,6 +499,35 @@ static BOOL IUALoadPointFromIdentifier(NSString *identifier, CGPoint *outPoint, 
 
     simple(@"perf_sample", ^(IUACommand *cmd, void (^finish)(BOOL, NSDictionary *, NSString *)) {
         finish(YES, [IUAPerfSampler instantSample], nil);
+    });
+
+    // ---- 等待元素出现/消失（页面流转测试刚需；轮询不阻塞主线程）----
+    simple(@"wait_for", ^(IUACommand *cmd, void (^finish)(BOOL, NSDictionary *, NSString *)) {
+        NSString *identifier = [cmd stringParam:@"identifier"];
+        if (identifier.length == 0) {
+            finish(NO, nil, @"wait_for 需要 params.identifier");
+            return;
+        }
+        BOOL waitForDisappear = [[cmd stringParam:@"state"] isEqualToString:@"disappear"];
+        double timeout = MIN(MAX([cmd floatParam:@"timeout" default:10], 0.5), 60);
+        [self waitForIdentifier:identifier
+                    disappearing:waitForDisappear
+                        deadline:[NSDate dateWithTimeIntervalSinceNow:timeout]
+                          waited:0
+                        interval:0.3
+                       completion:finish];
+    });
+
+    // ---- 滚动到指定元素可见（显式导航；tap 已内置自动滚动，此指令用于主动定位）----
+    simple(@"scroll_to", ^(IUACommand *cmd, void (^finish)(BOOL, NSDictionary *, NSString *)) {
+        NSString *identifier = [cmd stringParam:@"identifier"];
+        UIView *view = identifier.length > 0 ? [IUAViewIntrospector findViewWithIdentifier:identifier] : nil;
+        if (!view) {
+            finish(NO, nil, [NSString stringWithFormat:@"scroll_to: 找不到 view: identifier=%@", identifier]);
+            return;
+        }
+        [self ensureViewVisible:view];
+        finish(YES, @{@"scrolledTo" : identifier}, nil);
     });
 
     // ---- 按键：回车/删除/退格/任意字符（不依赖系统键盘 UI 是否显示）----
@@ -590,6 +661,38 @@ static BOOL IUALoadPointFromIdentifier(NSString *identifier, CGPoint *outPoint, 
         }
         finish(NO, nil, error.localizedDescription);
     }];
+}
+
+/// wait_for 轮询：主线程 dispatch_after 链，不阻塞 UI
+- (void)waitForIdentifier:(NSString *)identifier
+              disappearing:(BOOL)disappearing
+                  deadline:(NSDate *)deadline
+                    waited:(NSTimeInterval)waited
+                  interval:(NSTimeInterval)interval
+                 completion:(void (^)(BOOL, NSDictionary *, NSString *))finish {
+    BOOL exists = ([IUAViewIntrospector findViewWithIdentifier:identifier] != nil);
+    if (disappearing ? !exists : exists) {
+        finish(YES, @{@"identifier" : identifier,
+                      @"state" : disappearing ? @"disappeared" : @"appeared",
+                      @"waited" : @(round(waited * 10) / 10)}, nil);
+        return;
+    }
+    if ([NSDate.date compare:deadline] != NSOrderedAscending) {
+        finish(NO, nil, [NSString stringWithFormat:@"wait_for: %.1fs 内元素 %@ 未%@",
+                         waited, identifier, disappearing ? @"消失" : @"出现"]);
+        return;
+    }
+    __weak typeof(self) weakSelf = self;
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(interval * NSEC_PER_SEC)),
+                   dispatch_get_main_queue(), ^{
+        __strong typeof(weakSelf) strongSelf = weakSelf;
+        [strongSelf waitForIdentifier:identifier
+                          disappearing:disappearing
+                              deadline:deadline
+                                waited:waited + interval
+                              interval:interval
+                             completion:finish];
+    });
 }
 
 /// 中心点不在可视 window 内（含状态栏上方）时，滚动最近的 UIScrollView 祖先使其可见

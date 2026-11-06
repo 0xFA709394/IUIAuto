@@ -26,6 +26,9 @@ const ALIASES = {
   '输入': 'type', 'type': 'type', 'input': 'type',
   '清空': 'clear', 'clear': 'clear',
   '滑动': 'swipe', 'swipe': 'swipe',
+  '上滑': 'swipeup', '下滑': 'swipedown', '左滑': 'swipeleft', '右滑': 'swiperight',
+  '等待出现': 'waitappear', '等待消失': 'waitdisappear', '滚动到': 'scrollto',
+  '断言值': 'avalue', 'assert-value': 'avalue',
   '捏合': 'pinch', 'pinch': 'pinch',
   '等待': 'wait', 'wait': 'wait', 'sleep': 'wait',
   '收起键盘': 'keyboard', '收键盘': 'keyboard', 'dismiss': 'keyboard', 'keyboard': 'keyboard',
@@ -146,6 +149,43 @@ export function parseScript(text) {
         const params = { fromX: +args[0], fromY: +args[1], toX: +args[2], toY: +args[3] };
         if (isNumber(args[4])) params.duration = +args[4];
         emit(action('swipe', params, lineNo));
+        break;
+      }
+      case 'swipeup': case 'swipedown': case 'swipeleft': case 'swiperight': {
+        // 方向滑动：可选 [距离pt] [起点元素标识] [秒]
+        // 上滑=手指向上（内容向上滚动看下方内容）
+        const dirMap = { swipeup: 'up', swipedown: 'down', swipeleft: 'left', swiperight: 'right' };
+        const params = { direction: dirMap[canonical] };
+        if (isNumber(args[0])) params.distance = +args[0];
+        const originId = args.find(a => !isNumber(a));
+        if (originId) params.originIdentifier = originId;
+        if (args.length >= 2 && isNumber(args[args.length - 1]) && args.length > 1) {
+          const maybeDur = +args[args.length - 1];
+          if (maybeDur <= 3 && args.indexOf(args[args.length - 1]) > (isNumber(args[0]) ? 1 : 0)) {
+            params.duration = maybeDur;   // 末尾 ≤3 的小数视为时长
+          }
+        }
+        steps.push(action('swipe', params, lineNo));
+        break;
+      }
+      case 'waitappear': case 'waitdisappear': {
+        if (!args[0]) throw new Error(`第 ${lineNo} 行: ${cmdWord} 需要 identifier [超时秒]`);
+        const params = { identifier: args[0], state: canonical === 'waitappear' ? 'appear' : 'disappear', timeout: 10 };
+        if (isNumber(args[1])) params.timeout = Math.min(+args[1], 60);
+        steps.push(action('wait_for', params, lineNo));
+        break;
+      }
+      case 'scrollto': {
+        if (!args[0]) throw new Error(`第 ${lineNo} 行: 滚动到 需要 identifier`);
+        steps.push(action('scroll_to', { identifier: args[0] }, lineNo));
+        break;
+      }
+      case 'avalue': {
+        if (args.length < 3) throw new Error(`第 ${lineNo} 行: 断言值 需要 identifier [包含|等于] 值`);
+        const kind = args[1] === '包含' ? 'value_contains' : 'value_equals';
+        const at = rest.indexOf(args[1]);
+        const value = at >= 0 ? rest.slice(at + args[1].length).trim() : args.slice(2).join(' ');
+        steps.push(assert(kind, args[0], value, lineNo));
         break;
       }
       case 'pinch': {
