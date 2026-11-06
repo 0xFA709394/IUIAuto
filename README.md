@@ -196,6 +196,8 @@ node run_script.js 用例1.txt
 | 等待消失 <标识> [秒] | wait_for | `等待消失 loading 5` |
 | 上滑/下滑/左滑/右滑 [pt] [起点] | swipe | `上滑 400`、`下滑 300 btn.counter` |
 | 滚动到 <标识> | scroll_to | `滚动到 label.row.12` |
+| 断言外观 <名称> [阈值%] | assert-look | `断言外观 home 1.0`（视觉回归；首跑自动建基线，差异超阈值失败） |
+| ${rand-11}/${ts}/${date}/${uuid} | 变量 | `输入 field.x 手机${rand-11}`（运行时替换） |
 | 断言值 <标识> 包含/等于 值 | assert-value | `断言值 slider.demo 等于 50`（slider/switch 值） |
 | 循环 N … 结束循环 | loop | `循环 5` / `结束循环`（块内重复 5 次，可嵌套，上限 100） |
 | 截图 [文件] | shot | `截图 demo.png` |

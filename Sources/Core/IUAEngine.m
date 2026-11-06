@@ -440,6 +440,28 @@ static BOOL IUALoadPointFromIdentifier(NSString *identifier, CGPoint *outPoint, 
         finish(YES, [IUAViewIntrospector infoJSONForView:view maxDepth:2], nil);
     });
 
+    // ---- 视觉回归：与基线图逐像素对比 ----
+    simple(@"screenshot_compare", ^(IUACommand *cmd, void (^finish)(BOOL, NSDictionary *, NSString *)) {
+        NSString *baseline = [cmd stringParam:@"baseline"];
+        if (baseline.length == 0) {
+            finish(NO, nil, @"screenshot_compare 需要 params.baseline（基线 PNG 的 base64）");
+            return;
+        }
+        CGFloat threshold = [cmd floatParam:@"thresholdPercent" default:1.0];
+        NSDictionary *result = [IUAScreenshotService compareWithBaselineBase64:baseline thresholdPercent:threshold];
+        if (!result) {
+            finish(NO, nil, @"对比失败（截图或基线解码失败）");
+            return;
+        }
+        if ([result[@"sizeMismatch"] boolValue]) {
+            finish(NO, result, @"当前截图与基线尺寸不一致（需重新生成基线）");
+            return;
+        }
+        BOOL pass = [result[@"pass"] boolValue];
+        finish(pass, result, pass ? nil : [NSString stringWithFormat:@"视觉差异 %.3f%% 超过阈值 %.2f%%",
+                                           [result[@"diffPercent"] doubleValue], threshold]);
+    });
+
     simple(@"screenshot", ^(IUACommand *cmd, void (^finish)(BOOL, NSDictionary *, NSString *)) {
         NSUInteger quality = (NSUInteger)[cmd integerParam:@"quality" default:1];
         NSDictionary *info = [IUAScreenshotService screenshotWithQuality:quality];

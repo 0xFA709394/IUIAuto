@@ -29,6 +29,7 @@ const ALIASES = {
   '上滑': 'swipeup', '下滑': 'swipedown', '左滑': 'swipeleft', '右滑': 'swiperight',
   '等待出现': 'waitappear', '等待消失': 'waitdisappear', '滚动到': 'scrollto',
   '断言值': 'avalue', 'assert-value': 'avalue',
+  '断言外观': 'alook', 'assert-look': 'alook', 'assert-appearance': 'alook',
   '捏合': 'pinch', 'pinch': 'pinch',
   '等待': 'wait', 'wait': 'wait', 'sleep': 'wait',
   '收起键盘': 'keyboard', '收键盘': 'keyboard', 'dismiss': 'keyboard', 'keyboard': 'keyboard',
@@ -48,7 +49,32 @@ const isNumber = (s) => s !== '' && !isNaN(+s);
  * 支持块语法：`循环 N` … `结束循环`（编译期展开为重复步骤，N 上限 100）
  * 解析失败时 throw Error（含行号）。
  */
+/** DSL 变量替换：${ts}/${date}/${uuid}/${rand-N}/${env.XXX} */
+export function expandVariables(text) {
+  const now = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  const vars = {
+    ts: String(Math.floor(now.getTime() / 1000)),
+    date: `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}`,
+    uuid: 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+      const r = Math.random() * 16 | 0;
+      return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+    }),
+  };
+  return text
+    .replace(/\$\{rand-(\d+)\}/g, (_, n) => {
+      let s = '';
+      for (let i = 0; i < +n; i++) s += Math.floor(Math.random() * 10);
+      return s;
+    })
+    .replace(/\$\{ts\}/g, vars.ts)
+    .replace(/\$\{date\}/g, vars.date)
+    .replace(/\$\{uuid\}/g, vars.uuid)
+    .replace(/\$\{env\.([A-Za-z_][A-Za-z0-9_]*)\}/g, (_, k) => process.env[k] ?? '');
+}
+
 export function parseScript(text) {
+  text = expandVariables(text);
   const steps = [];
   const loopStack = [];  // { count, bodyStart: steps.length 快照用数组 }
   const loopBodies = []; // 与 loopStack 平行：每层循环体的独立步骤数组
@@ -186,6 +212,13 @@ export function parseScript(text) {
         const at = rest.indexOf(args[1]);
         const value = at >= 0 ? rest.slice(at + args[1].length).trim() : args.slice(2).join(' ');
         steps.push(assert(kind, args[0], value, lineNo));
+        break;
+      }
+      case 'alook': {
+        // 断言外观 <名称> [阈值%]：视觉回归（基线不存在时自动建立）
+        if (!args[0]) throw new Error(`第 ${lineNo} 行: 断言外观 需要 基线名称 [阈值%]`);
+        steps.push({ type: 'look', name: args[0],
+                     threshold: isNumber(args[1]) ? +args[1] : 1.0, line: lineNo });
         break;
       }
       case 'pinch': {

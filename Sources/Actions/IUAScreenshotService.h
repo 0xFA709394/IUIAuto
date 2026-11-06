@@ -40,4 +40,10 @@ NS_ASSUME_NONNULL_BEGIN
 
 @end
 
+@interface IUAScreenshotService (Compare)
+/// 与基线图逐像素对比（阈值百分比内 pass；尺寸不一致返回 sizeMismatch）
++ (nullable NSDictionary<NSString *, id> *)compareWithBaselineBase64:(NSString *)baselineBase64
+                                                    thresholdPercent:(CGFloat)threshold;
+@end
+
 NS_ASSUME_NONNULL_END

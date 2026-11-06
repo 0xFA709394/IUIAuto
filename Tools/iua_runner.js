@@ -13,6 +13,12 @@
  * @param {Object} [opts] { shotSaver: async (file, dataUrlBase64) => void }
  * @returns {Promise<{passed:number, total:number, ok:boolean, results:Array}>}
  */
+import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const BASELINE_DIR = join(dirname(fileURLToPath(import.meta.url)), 'baselines');
+
 export async function runSteps(steps, send, onProgress = () => {}, opts = {}) {
   const results = [];
   const total = steps.length;
@@ -45,6 +51,12 @@ export async function runSteps(steps, send, onProgress = () => {}, opts = {}) {
       } else if (!r.ok) {
         detail = r.error || '失败';
       }
+    } else if (step.type === 'look') {
+      kind = 'assert';
+      desc = `断言外观 ${step.name}（阈值 ${step.threshold}%）`;
+      const a = await runLookAssert(step, send);
+      pass = a.pass;
+      detail = a.detail;
     } else if (step.type === 'assert') {
       kind = 'assert';
       desc = `断言 ${step.kind} ${step.identifier} ${step.value ?? ''}`.trim();
@@ -89,4 +101,27 @@ async function runAssert(step, send) {
   return kind === 'text_contains'
     ? { pass: text.includes(value), detail: `实际="${text}"` }
     : { pass: text === value, detail: `实际="${text}" 期望="${value}"` };
+}
+
+
+/** 视觉回归：基线不存在→自动建立并 pass；存在→screenshot_compare */
+async function runLookAssert(step, send) {
+  if (!existsSync(BASELINE_DIR)) mkdirSync(BASELINE_DIR, { recursive: true });
+  const file = join(BASELINE_DIR, step.name.endsWith('.png') ? step.name : step.name + '.png');
+
+  if (!existsSync(file)) {
+    // 首次：以当前截图建立基线
+    const r = await send('screenshot', { quality: 2 }, 30);
+    if (!r.ok) return { pass: false, detail: `基线建立失败: ${r.error}` };
+    writeFileSync(file, Buffer.from(r.data.image, 'base64'));
+    return { pass: true, detail: `基线已建立 → ${file.split('/').pop()}（${r.data.width | 0}x${r.data.height | 0}）` };
+  }
+
+  const baselineBase64 = readFileSync(file).toString('base64');
+  const r = await send('screenshot_compare', { baseline: baselineBase64, thresholdPercent: step.threshold }, 30);
+  if (!r.ok) {
+    return { pass: false, detail: r.error || '对比失败' };
+  }
+  const d = r.data;
+  return { pass: d.pass !== false, detail: `差异 ${d.diffPercent}% / 阈值 ${d.thresholdPercent}%（${d.diffPixels}/${d.totalPixels} 像素）` };
 }
