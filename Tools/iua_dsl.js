@@ -23,11 +23,14 @@ const ALIASES = {
   '点击': 'tap', 'tap': 'tap', 'click': 'tap',
   '双击': 'dtap', 'dtap': 'dtap', 'double': 'dtap',
   '长按': 'press', 'press': 'press', 'long': 'press', 'longpress': 'press',
-  '输入': 'type', 'type': 'type', 'input': 'type',
+  '输入': 'type', 'type': 'type', 'input': 'type', 'settext': 'type',
+  '追加输入': 'append', 'append': 'append', 'typeappend': 'append',
   '清空': 'clear', 'clear': 'clear',
   '滑动': 'swipe', 'swipe': 'swipe',
   '上滑': 'swipeup', '下滑': 'swipedown', '左滑': 'swipeleft', '右滑': 'swiperight',
   '等待出现': 'waitappear', '等待消失': 'waitdisappear', '滚动到': 'scrollto',
+  '滚动到顶': 'scrolltop', '回到顶部': 'scrolltop', 'scrolltop': 'scrolltop', 'scroll-to-top': 'scrolltop',
+  '滚动到底': 'scrollbottom', '到底部': 'scrollbottom', 'scrollbottom': 'scrollbottom', 'scroll-to-bottom': 'scrollbottom',
   '断言值': 'avalue', 'assert-value': 'avalue',
   '断言外观': 'alook', 'assert-look': 'alook', 'assert-appearance': 'alook',
   '捏合': 'pinch', 'pinch': 'pinch',
@@ -38,7 +41,77 @@ const ALIASES = {
   '断言文本': 'atext', 'assert-text': 'atext', 'asserttext': 'atext',
   '断言存在': 'aexists', 'assert-exists': 'aexists', 'assertexists': 'aexists',
   '断言不存在': 'amissing', 'assert-missing': 'amissing', 'assertmissing': 'amissing',
+  '查找': 'find', 'find': 'find', '查找元素': 'find',
+  '断言属性': 'aattr', 'assert-attr': 'aattr', 'assert-attribute': 'aattr', '断言特性': 'aattr',
+  '断言显示': 'adisplayed', 'assert-displayed': 'adisplayed', '断言可见': 'adisplayed',
+  '断言隐藏': 'ahidden', 'assert-hidden': 'ahidden', '断言不可见': 'ahidden',
+  '断言可用': 'aenabled', 'assert-enabled': 'aenabled',
+  '断言不可用': 'adisabled', 'assert-disabled': 'adisabled',
+  '断言选中': 'aselected', 'assert-selected': 'aselected',
+  '页面源码': 'source', 'source': 'source', 'pagesource': 'source', 'page-source': 'source',
+  '元素截图': 'eshot', 'element-shot': 'eshot', 'element-screenshot': 'eshot', '元素截屏': 'eshot',
+  '剪贴板': 'clipboard', 'clipboard': 'clipboard',
+  '旋转': 'orientation', 'orientation': 'orientation', '旋转屏幕': 'orientation',
+  '键盘状态': 'keyboardstate', 'keyboard-state': 'keyboardstate', 'iskeyboardshown': 'keyboardstate',
+  '打开链接': 'openurl', 'open-url': 'openurl', 'openurl': 'openurl',
+  '弹窗': 'alert', 'alert': 'alert',
+  '摇一摇': 'shake', 'shake': 'shake',
+  '应用状态': 'appstate', 'app-state': 'appstate', 'appstate': 'appstate',
 };
+
+// 定位表达式前缀 → Appium 定位策略
+const LOCATOR_PREFIXES = {
+  'id': 'accessibility id',
+  'aid': 'accessibility id',
+  'accessibility': 'accessibility id',
+  'accessibility-id': 'accessibility id',
+  'identifier': 'accessibility id',
+  'name': 'name',
+  'label': 'label',
+  'text': 'text',
+  'class': 'class name',
+  'type': 'class name',
+  'xpath': 'xpath',
+  'predicate': '-ios predicate string',
+  'ios-predicate': '-ios predicate string',
+  'chain': '-ios class chain',
+  'classchain': '-ios class chain',
+  'class-chain': '-ios class chain',
+};
+
+/** 解析 `xpath=//...` / `label=登录` 形式的定位表达式；不是表达式返回 null */
+export function parseLocatorExpression(token) {
+  if (!token || typeof token !== 'string') return null;
+  const eq = token.indexOf('=');
+  if (eq <= 0) return null;
+  const prefix = token.slice(0, eq).trim().toLowerCase();
+  const value = token.slice(eq + 1);
+  const using = LOCATOR_PREFIXES[prefix];
+  if (!using || !value) return null;
+  return { using, value };
+}
+
+/** 裸标识默认按 accessibility id 处理；以表达式前缀开头则按对应策略 */
+export function locatorFromToken(token) {
+  return parseLocatorExpression(token) || { using: 'accessibility id', value: String(token ?? '') };
+}
+
+/** 参数对象 → DSL 中的定位表达式（录制步骤/报告用） */
+export function locatorToText(params = {}) {
+  const using = params.using || 'accessibility id';
+  const value = params.value ?? '';
+  if (using === 'accessibility id' || using === 'id') return String(value);
+  const prefix = {
+    'name': 'name',
+    'label': 'label',
+    'text': 'text',
+    'class name': 'class',
+    'xpath': 'xpath',
+    '-ios predicate string': 'predicate',
+    '-ios class chain': 'chain',
+  }[using];
+  return prefix ? `${prefix}=${value}` : String(value);
+}
 
 const isNumber = (s) => s !== '' && !isNaN(+s);
 
@@ -132,7 +205,12 @@ export function parseScript(text) {
           if (!isNumber(args[1])) throw new Error(`第 ${lineNo} 行: 点击 坐标需要两个数字`);
           emit(action('tap', { x: +args[0], y: +args[1] }, lineNo));
         } else {
-          emit(action('tap_view', { identifier: args[0] }, lineNo));
+          const loc = parseLocatorExpression(args[0]);
+          if (loc) {
+            emit(action('element_action', { ...loc, action: 'click' }, lineNo));
+          } else {
+            emit(action('tap_view', { identifier: args[0] }, lineNo));
+          }
         }
         break;
       case 'dtap':
@@ -141,7 +219,12 @@ export function parseScript(text) {
           emit(action('double_tap', { x: +args[0], y: +args[1] }, lineNo));
         } else {
           if (!args[0]) throw new Error(`第 ${lineNo} 行: 双击 需要 identifier 或 x y`);
-          emit(action('double_tap', { identifier: args[0] }, lineNo));
+          const loc = parseLocatorExpression(args[0]);
+          if (loc) {
+            emit(action('element_action', { ...loc, action: 'double_click' }, lineNo));
+          } else {
+            emit(action('double_tap', { identifier: args[0] }, lineNo));
+          }
         }
         break;
       case 'press': {
@@ -151,22 +234,39 @@ export function parseScript(text) {
           emit(action('long_press', { x: +args[0], y: +args[1], duration: dur }, lineNo));
         } else {
           const dur = isNumber(args[1]) ? +args[1] : 0.8;
-          emit(action('long_press', { identifier: args[0], duration: dur }, lineNo));
+          const loc = parseLocatorExpression(args[0]);
+          if (loc) {
+            emit(action('element_action', { ...loc, action: 'long_click', duration: dur }, lineNo));
+          } else {
+            emit(action('long_press', { identifier: args[0], duration: dur }, lineNo));
+          }
         }
         break;
       }
-      case 'type': {
-        if (args.length < 2) throw new Error(`第 ${lineNo} 行: 输入 需要 identifier 文本`);
-        const identifier = args[0];
-        // 从 args[1] 起重组文本（indexOf 方案在 identifier 含特殊片段时可能错位）
-        const text = rest.slice(rest.indexOf(identifier) + identifier.length).trim();
-        emit(action('type_text', { identifier, text: text || args.slice(1).join(' ') }, lineNo));
+      case 'type': case 'append': {
+        if (!rest) throw new Error(`第 ${lineNo} 行: 输入 需要 identifier 文本`);
+        const parsed = parseLocatorAndText(rest, args);
+        const identifier = parsed.token;
+        const text = parsed.text;
+        if (!identifier || !text) throw new Error(`第 ${lineNo} 行: 输入 需要 identifier 文本`);
+        const loc = parseLocatorExpression(identifier);
+        const appendOnly = canonical === 'append';
+        if (loc) {
+          if (!appendOnly) emit(action('element_action', { ...loc, action: 'clear' }, lineNo));
+          emit(action('element_action', { ...loc, action: 'send_keys', text }, lineNo));
+        } else {
+          if (!appendOnly) emit(action('clear_text', { identifier }, lineNo));
+          emit(action('type_text', { identifier, text }, lineNo));
+        }
         break;
       }
-      case 'clear':
+      case 'clear': {
         if (!args.length) throw new Error(`第 ${lineNo} 行: 清空 需要 identifier`);
-        emit(action('clear_text', { identifier: args[0] }, lineNo));
+        const loc = parseLocatorExpression(args[0]);
+        if (loc) emit(action('element_action', { ...loc, action: 'clear' }, lineNo));
+        else emit(action('clear_text', { identifier: args[0] }, lineNo));
         break;
+      }
       case 'swipe': {
         // 按位置校验（filter 方案会把非数字 token 静默挤掉导致坐标错位配对）
         if (![0, 1, 2, 3].every((i) => isNumber(args[i]))) {
@@ -196,14 +296,28 @@ export function parseScript(text) {
       }
       case 'waitappear': case 'waitdisappear': {
         if (!args[0]) throw new Error(`第 ${lineNo} 行: ${cmdWord} 需要 identifier [超时秒]`);
-        const params = { identifier: args[0], state: canonical === 'waitappear' ? 'appear' : 'disappear', timeout: 10 };
+        const state = canonical === 'waitappear' ? 'appear' : 'disappear';
+        const params = { state, timeout: 10 };
         if (isNumber(args[1])) params.timeout = Math.min(+args[1], 60);
-        steps.push(action('wait_for', params, lineNo));
+        const loc = parseLocatorExpression(args[0]);
+        if (loc) {
+          steps.push(action('wait_for_element', { ...loc, ...params }, lineNo));
+        } else {
+          steps.push(action('wait_for', { identifier: args[0], ...params }, lineNo));
+        }
         break;
       }
       case 'scrollto': {
         if (!args[0]) throw new Error(`第 ${lineNo} 行: 滚动到 需要 identifier`);
-        steps.push(action('scroll_to', { identifier: args[0] }, lineNo));
+        const loc = parseLocatorExpression(args[0]);
+        if (loc) steps.push(action('element_action', { ...loc, action: 'scroll_to' }, lineNo));
+        else steps.push(action('scroll_to', { identifier: args[0] }, lineNo));
+        break;
+      }
+      case 'scrolltop': case 'scrollbottom': {
+        const loc = args[0] ? locatorFromToken(args[0]) : { using: 'class name', value: 'UIScrollView', index: 0 };
+        const actionName = canonical === 'scrolltop' ? 'scroll_to_top' : 'scroll_to_bottom';
+        steps.push(action('element_action', { ...loc, action: actionName }, lineNo));
         break;
       }
       case 'avalue': {
@@ -211,7 +325,9 @@ export function parseScript(text) {
         const kind = args[1] === '包含' ? 'value_contains' : 'value_equals';
         const at = rest.indexOf(args[1]);
         const value = at >= 0 ? rest.slice(at + args[1].length).trim() : args.slice(2).join(' ');
-        steps.push(assert(kind, args[0], value, lineNo));
+        const loc = parseLocatorExpression(args[0]);
+        if (loc) steps.push({ type: 'assert', kind, locator: loc, value, line: lineNo });
+        else steps.push(assert(kind, args[0], value, lineNo));
         break;
       }
       case 'alook': {
@@ -272,16 +388,113 @@ export function parseScript(text) {
         // 安全提取：indexOf 未命中时回退为 args[2] 起重组，避免负索引错位截断
         const at = rest.indexOf(opWord);
         const value = at >= 0 ? rest.slice(at + opWord.length).trim() : args.slice(2).join(' ');
-        emit(assert(kind, identifier, value, lineNo));
+        const loc = parseLocatorExpression(identifier);
+        if (loc) emit({ type: 'assert', kind, locator: loc, value, line: lineNo });
+        else emit(assert(kind, identifier, value, lineNo));
         break;
       }
-      case 'aexists':
+      case 'aexists': {
         if (!args[0]) throw new Error(`第 ${lineNo} 行: 断言存在 需要 identifier`);
-        emit(assert('exists', args[0], null, lineNo));
+        const loc = parseLocatorExpression(args[0]);
+        if (loc) emit({ type: 'assert', kind: 'exists', locator: loc, value: null, line: lineNo });
+        else emit(assert('exists', args[0], null, lineNo));
         break;
-      case 'amissing':
+      }
+      case 'amissing': {
         if (!args[0]) throw new Error(`第 ${lineNo} 行: 断言不存在 需要 identifier`);
-        emit(assert('missing', args[0], null, lineNo));
+        const loc = parseLocatorExpression(args[0]);
+        if (loc) emit({ type: 'assert', kind: 'missing', locator: loc, value: null, line: lineNo });
+        else emit(assert('missing', args[0], null, lineNo));
+        break;
+      }
+      case 'find': {
+        if (!args[0]) throw new Error(`第 ${lineNo} 行: 查找 需要 identifier 或定位表达式`);
+        const loc = locatorFromToken(args[0]);
+        emit(action('find_element', { ...loc }, lineNo));
+        break;
+      }
+      case 'aattr': {
+        if (args.length < 4) throw new Error(`第 ${lineNo} 行: 断言属性 需要 <定位> <属性> 包含|等于 <值>`);
+        const loc = locatorFromToken(args[0]);
+        const attribute = args[1];
+        const opWord = args[2];
+        const isContains = opWord === '包含' || opWord === 'contains';
+        const isEquals = opWord === '等于' || opWord === 'equals';
+        if (!isContains && !isEquals) {
+          throw new Error(`第 ${lineNo} 行: 断言属性 第三个参数须为 包含/等于（实际 "${opWord}"）`);
+        }
+        const at = rest.indexOf(opWord);
+        const value = at >= 0 ? rest.slice(at + opWord.length).trim() : args.slice(3).join(' ');
+        steps.push({ type: 'assert', kind: isContains ? 'attribute_contains' : 'attribute_equals',
+                     locator: loc, attribute, value, line: lineNo });
+        break;
+      }
+      case 'adisplayed': case 'ahidden': case 'aenabled': case 'adisabled': case 'aselected': {
+        if (!args[0]) throw new Error(`第 ${lineNo} 行: ${cmdWord} 需要 identifier 或定位表达式`);
+        const loc = locatorFromToken(args[0]);
+        const kindMap = { adisplayed: 'displayed', ahidden: 'hidden',
+                          aenabled: 'enabled', adisabled: 'disabled', aselected: 'selected' };
+        steps.push({ type: 'assert', kind: kindMap[canonical], locator: loc, value: null, line: lineNo });
+        break;
+      }
+      case 'source': {
+        steps.push({ type: 'source', file: args[0] || null, line: lineNo });
+        break;
+      }
+      case 'eshot': {
+        if (!args[0]) throw new Error(`第 ${lineNo} 行: 元素截图 需要 identifier 或定位表达式`);
+        steps.push({ type: 'element_shot', locator: locatorFromToken(args[0]),
+                     file: args[1] || 'element.png', line: lineNo });
+        break;
+      }
+      case 'clipboard': {
+        const sub = (args[0] || '').toLowerCase();
+        if (sub === '设置' || sub === 'set') {
+          const text = rest.slice(rest.indexOf(args[0]) + args[0].length).trim();
+          emit(action('clipboard_set', { text }, lineNo));
+        } else if (sub === '获取' || sub === 'get') {
+          emit(action('clipboard_get', {}, lineNo));
+        } else {
+          throw new Error(`第 ${lineNo} 行: 剪贴板 需要 设置 <文本> 或 获取`);
+        }
+        break;
+      }
+      case 'orientation': {
+        const word = (args[0] || '').toLowerCase();
+        const landscape = word === '横屏' || word === 'landscape' || word === '横向';
+        const portrait = word === '竖屏' || word === 'portrait' || word === '纵向';
+        if (!landscape && !portrait) {
+          emit(action('orientation', {}, lineNo));
+        } else {
+          emit(action('orientation', { orientation: landscape ? 'LANDSCAPE' : 'PORTRAIT' }, lineNo));
+        }
+        break;
+      }
+      case 'keyboardstate':
+        emit(action('keyboard_state', {}, lineNo));
+        break;
+      case 'openurl': {
+        if (!args[0]) throw new Error(`第 ${lineNo} 行: 打开链接 需要 URL`);
+        emit(action('open_url', { url: args[0] }, lineNo));
+        break;
+      }
+      case 'alert': {
+        const sub = (args[0] || '文本').toLowerCase();
+        const actionName = (sub === '接受' || sub === 'accept') ? 'accept'
+          : (sub === '关闭' || sub === 'dismiss') ? 'dismiss'
+          : (sub === '设置文本' || sub === 'settext') ? 'set_text' : 'get';
+        const params = { action: actionName };
+        if (actionName === 'set_text') {
+          params.text = rest.slice(rest.indexOf(args[0]) + args[0].length).trim();
+        }
+        emit(action('alert', params, lineNo));
+        break;
+      }
+      case 'shake':
+        emit(action('shake', {}, lineNo));
+        break;
+      case 'appstate':
+        emit(action('app_state', {}, lineNo));
         break;
     }
   });
@@ -311,12 +524,47 @@ export function stepsToDSL(steps) {
         lines.push(`滑动 ${s.fromX} ${s.fromY} ${s.toX} ${s.toY}${id ? `   # ${id}` : ''}`);
         break;
       case 'type_text':
-        // 回放的输入是追加式（insertText），先清空再输入保证终态与录制时一致
-        lines.push(id ? `清空 ${id}` : `# 跳过无标识输入步骤: ${JSON.stringify(s)}`);
-        if (id) lines.push(`输入 ${id} ${s.text}`);
+        // 输入命令本身会先清空再写入，保证终态与录制时一致
+        lines.push(id ? `输入 ${id} ${s.text}` : `# 跳过无标识输入步骤: ${JSON.stringify(s)}`);
         break;
       case 'clear_text':
         lines.push(`清空 ${id}`);
+        break;
+      case 'element_action': {
+        const loc = locatorToText(s);
+        switch (s.action) {
+          case 'click': lines.push(`点击 ${loc}`); break;
+          case 'double_click': lines.push(`双击 ${loc}`); break;
+          case 'long_click': lines.push(`长按 ${loc} ${s.duration ?? 1.0}`); break;
+          case 'send_keys': lines.push(`输入 ${loc} ${s.text ?? ''}`); break;
+          case 'clear': lines.push(`清空 ${loc}`); break;
+          case 'scroll_to': lines.push(`滚动到 ${loc}`); break;
+          case 'scroll_to_top': lines.push(`滚动到顶${s.using === 'class name' ? '' : ' ' + loc}`); break;
+          case 'scroll_to_bottom': lines.push(`滚动到底${s.using === 'class name' ? '' : ' ' + loc}`); break;
+          default: lines.push(`# 元素动作 ${s.action}: ${JSON.stringify(s)}`);
+        }
+        break;
+      }
+      case 'find_element':
+        lines.push(`查找 ${locatorToText(s)}`);
+        break;
+      case 'wait_for_element':
+        lines.push(`${s.state === 'disappear' ? '等待消失' : '等待出现'} ${locatorToText(s)} ${s.timeout ?? 10}`);
+        break;
+      case 'clipboard_set':
+        lines.push(`剪贴板 设置 ${s.text ?? ''}`);
+        break;
+      case 'clipboard_get':
+        lines.push('剪贴板 获取');
+        break;
+      case 'open_url':
+        lines.push(`打开链接 ${s.url ?? ''}`);
+        break;
+      case 'orientation':
+        lines.push(s.orientation ? `旋转 ${s.orientation}` : '旋转');
+        break;
+      case 'alert':
+        lines.push(`弹窗 ${s.action ?? 'get'}`);
         break;
       default:
         lines.push(`# 未识别步骤: ${JSON.stringify(s)}`);
@@ -325,12 +573,43 @@ export function stepsToDSL(steps) {
   return lines.join('\n') + '\n';
 }
 
+/** 输入类命令解析：支持 `输入 <定位> 文本`、`输入 <定位> | 文本` 与引号定位 */
+function parseLocatorAndText(rest, args) {
+  const pipe = rest.indexOf(' | ');
+  if (pipe >= 0) {
+    return { token: rest.slice(0, pipe).trim(), text: rest.slice(pipe + 3).trim() };
+  }
+  const quoted = rest.match(/^(["'])([\s\S]*?)\1\s+([\s\S]*)$/);
+  if (quoted) {
+    return { token: quoted[2], text: quoted[3].trim() };
+  }
+  const token = args[0];
+  const at = rest.indexOf(token);
+  const text = at >= 0 ? rest.slice(at + token.length).trim() : args.slice(1).join(' ');
+  return { token, text: text || args.slice(1).join(' ') };
+}
+
 /** 使用说明文本 */
 export const DSL_HELP = `支持的命令（# 为注释）:
   点击 id|x y            双击 x y            长按 id|x y [秒]
-  输入 id 文本            清空 id
+  输入 id 文本（先清空）  追加输入 id 文本        清空 id
   滑动 fx fy tx ty [秒]   捏合 cx cy r1 r2
   等待 秒                 截图 [文件名]
   循环 N ... 结束循环     （块内步骤重复 N 次，上限 100）
   断言文本 id 包含|等于 文本
-  断言存在 id             断言不存在 id`;
+  断言存在 id             断言不存在 id
+
+定位表达式（把 id 换成任意策略）:
+  id=btn.counter  name=登录  label=提交  text=Count: 1
+  class=UIButton  xpath=//XCUIElementTypeButton[@name="btn.counter"]
+  predicate=type == "XCUIElementTypeButton"
+  chain=**/XCUIElementTypeButton[\`name == "btn.counter"\`]
+
+新增:
+  查找 <定位>                         输出元素属性
+  断言属性 <定位> <属性> 包含|等于 值   e.g. 断言属性 id=slider.demo value 等于 50
+  断言显示/断言隐藏/断言可用/断言不可用/断言选中 <定位>
+  元素截图 <定位> [文件名]             页面源码 [文件名]
+  滚动到顶 [定位] / 滚动到底 [定位]
+  剪贴板 设置 <文本> / 剪贴板 获取      旋转 横屏|竖屏
+  键盘状态   打开链接 <url>   弹窗 接受|关闭|文本   摇一摇   应用状态`;

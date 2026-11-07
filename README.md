@@ -5,6 +5,8 @@ iOS 自动化操作项目的 iOS 端：一个纯 Objective-C App，作为常驻 
 - ✅ 不依赖 XCUITest/UITest/XCTest runner
 - ✅ 非越狱真机可用（无需私有 entitlement，开发证书即可运行）
 - ✅ 零第三方依赖（WebSocket 用系统 `NSURLSessionWebSocketTask`）
+- ✅ **Appium 兼容**：内置 W3C WebDriver / Appium 桥（HTTP 4723），WebdriverIO / Appium Python/Java client 可直接驱动（[桥接指南](APPIUM_BRIDGE.md)）
+- ✅ **元素定位模型**：accessibility id / name / label / text / class name / XPath / iOS predicate / class chain 八种策略，元素级点击/输入/属性/截图
 - ✅ **录制回放**：真机手工操作一遍，自动生成可读脚本（`Tools/run_script.js --record`）
 - ✅ **中文 DSL 脚本 + 断言**：业务测试人员无需手写 JSON（`点击 btn.counter` / `断言文本 label.counter 包含 Count: 2`）
 - ✅ **性能监测**：脚本运行期间自动采样 App CPU/内存/FPS 并输出报告摘要；可同步调用 **xctrace** 录制 `.trace`（真机全模板可用）
@@ -15,12 +17,13 @@ iOS 自动化操作项目的 iOS 端：一个纯 Objective-C App，作为常驻 
 ## 工作原理
 
 ```
-控制服务器 ⇄ WebSocket(JSON) ⇄ IUAWebSocketClient        通信层：连接/心跳/指数退避重连(1s→30s)
-                               ⇅ IUACommandDispatcher      调度层：主线程串行 FIFO + 单条超时
-                               ⇅ IUAEngine                 总控：消息路由/动作注册/日志上报
-     ┌──────────────┬──────────────┬─────────────────┬──────────────┐
-IUATouchSynthesizer IUATextSynthesizer IUAViewIntrospector IUAScreenshotService
-(合成 UITouch 派发) (UIKeyInput 输入)  (view 树定位/查询)   (窗口截图 base64)
+Appium 客户端 ⇄ HTTP(W3C) ⇄ appium_bridge.js        W3C WebDriver 会话/元素/源码/手势/设备端点
+                             ⇅ WebSocket(JSON) ⇄ IUAWebSocketClient   通信层：连接/心跳/指数退避重连(1s→30s)
+                                                  ⇅ IUACommandDispatcher 调度层：主线程串行 FIFO + 单条超时
+                                                  ⇅ IUAEngine            总控：消息路由/动作注册/日志上报
+     ┌──────────────┬──────────────┬──────────────────┬──────────────────┐
+IUATouchSynthesizer IUATextSynthesizer IUAElementQuery IUAViewIntrospector IUAScreenshotService
+(合成 UITouch 派发) (UIKeyInput 输入)  (Appium 定位/属性) (view 树查询)     (窗口/元素截图)
 ```
 
 **触控合成**（`IUATouchSynthesizer`）：
@@ -138,6 +141,50 @@ node run_script.js --perf --xctrace 用例1.txt        # 双数据源同时开�
 | `dismiss_keyboard`（DSL：`收起键盘`） | 收起软键盘（避免遮挡点击） |
 | `tap_view` 自动滚动 | 元素不在可视区时自动 `scrollRectToVisible` 再点击，并带重试 |
 
+## Appium / WebDriver 桥（标准客户端接入）
+
+除自有 GUI/CLI 外，本工具内置 **W3C WebDriver / Appium 兼容 HTTP 桥**：
+
+```bash
+./start.sh                       # GUI 启动后桥自动在 http://localhost:4723
+# 或独立启动（无 GUI）：
+cd Tools && node appium_bridge.js --takeover
+```
+
+客户端用标准 Appium 方式连接即可：
+
+```js
+const driver = await remote({ hostname: '127.0.0.1', port: 4723, path: '/',
+  capabilities: { platformName: 'iOS', 'appium:automationName': 'IUIAuto',
+                  'appium:bundleId': 'com.iuiauto.example' } });
+await (await driver.$('~btn.counter')).click();
+console.log(await (await driver.$('~label.counter')).getText());   // Count: 1
+```
+
+- **支持**：session、`findElement(s)`、click/sendKeys/clear、text/attribute/rect/displayed/enabled/selected、
+  element/window screenshot、page source XML、W3C Actions（tap/双击/长按/滑动/捏合/键盘）、
+  implicit wait、orientation、clipboard、keyboard、alert、shake、performance_data、`mobile:` 命令。
+- **定位策略**：`accessibility id`、`name`、`label`、`text`、`class name`、`xpath`、
+  `-ios predicate string`、`-ios class chain`（另兼容 `tag name` / `link text`）。
+- **边界**：同一时间单会话；仅宿主 App 进程内；`terminateApp/backgroundApp/lock` 等进程级控制不支持。
+
+完整端点表、客户端示例、能力与边界见 **[APPIUM_BRIDGE.md](APPIUM_BRIDGE.md)**。
+
+### 元素级定位速查（GUI / DSL / 桥共用）
+
+| 策略 | 示例 |
+|---|---|
+| accessibility id | `btn.counter` / `id=btn.counter` |
+| label | `label=提交` |
+| text | `text=Count: 1` |
+| class name | `class=UIButton` |
+| XPath | `xpath=//XCUIElementTypeButton[@name="btn.counter"]` |
+| iOS predicate | `predicate=type == "XCUIElementTypeButton" AND label CONTAINS "点我"` |
+| iOS class chain | ``chain=**/XCUIElementTypeButton[`name == "btn.counter"`]`` |
+| 元素属性 | `name` / `label` / `value` / `type` / `rect` / `enabled` / `visible` / `xpath` … |
+
+GUI「Appium」页可直接选择策略、输入值、查找并执行点击/读文本/截图/滚动；也可查看/下载 page source XML。
+
 ## 录制回放 + DSL 脚本（CLI 方式）
 
 业务测试人员**不需要手写 JSON**。推荐工作流：
@@ -196,7 +243,18 @@ node run_script.js 用例1.txt
 | 等待消失 <标识> [秒] | wait_for | `等待消失 loading 5` |
 | 上滑/下滑/左滑/右滑 [pt] [起点] | swipe | `上滑 400`、`下滑 300 btn.counter` |
 | 滚动到 <标识> | scroll_to | `滚动到 label.row.12` |
+| 滚动到顶 / 滚动到底 [定位] | scroll-to-top | `滚动到顶` / `滚动到顶 scroll.demo` |
 | 断言外观 <名称> [阈值%] | assert-look | `断言外观 home 1.0`（视觉回归；首跑自动建基线，差异超阈值失败） |
+| 查找 <定位> | find | `查找 class=UISlider`（Appium 定位策略） |
+| 断言属性 <定位> <属性> 包含/等于 值 | assert-attr | `断言属性 id=slider.demo value 等于 50` |
+| 断言显示/隐藏/可用/不可用/选中 <定位> | assert-* | `断言显示 label=提交` |
+| 元素截图 <定位> [文件] | element-shot | `元素截图 xpath=... btn.png` |
+| 页面源码 [文件] | source | `页面源码 source.xml` |
+| 剪贴板 设置/获取 [文本] | clipboard | `剪贴板 设置 手机号` |
+| 旋转 横屏/竖屏 | orientation | `旋转 横屏` |
+| 键盘状态 / 应用状态 / 摇一摇 | device | `键盘状态` |
+| 打开链接 <url> | open-url | `打开链接 https://example.com` |
+| 弹窗 接受/关闭/文本 | alert | `弹窗 接受` |
 | ${rand-11}/${ts}/${date}/${uuid} | 变量 | `输入 field.x 手机${rand-11}`（运行时替换） |
 | 断言值 <标识> 包含/等于 值 | assert-value | `断言值 slider.demo 等于 50`（slider/switch 值） |
 | 循环 N … 结束循环 | loop | `循环 5` / `结束循环`（块内重复 5 次，可嵌套，上限 100） |
@@ -237,6 +295,21 @@ tap/长按/滑动按位移(≥14pt)与时长(≥0.45s)自动判定；输入通�
 | `clear_text` | `identifier?` | 清空输入框 |
 | `view_tree` | `maxDepth`? | 全窗口 view 树 JSON |
 | `element_info` | `identifier` | 单个元素信息（class/frame/text/…） |
+| `find_elements` | `using`,`value`,`index?`,`limit?` | Appium 策略查元素（返回属性+xpath+elementIndex） |
+| `find_element` | `using`,`value`,`index?` | 单个元素（找不到返回错误） |
+| `element_action` | 定位 + `action` | click/double_click/long_click/send_keys/clear/get_text/get_attribute/get_rect/is_displayed/is_enabled/is_selected/screenshot/scroll_to |
+| `page_source` | `maxDepth?` | Appium page source XML |
+| `element_screenshot` | 定位 + `quality?` | 元素截图 base64 |
+| `active_element` | — | 当前 firstResponder 元素 |
+| `wait_for_element` | 定位 + `state`/`timeout` | 按任意策略等待出现/消失 |
+| `device_info` | — | 设备/App/屏幕/电池/方向/键盘等完整信息 |
+| `orientation` | `orientation?` | 读取/设置方向（受宿主 Info.plist 限制） |
+| `keyboard_state` | — | 键盘是否显示 |
+| `clipboard_get` / `clipboard_set` | `text?` | 剪贴板读写 |
+| `alert` | `action`=`get/accept/dismiss/set_text` + `text?` | UIAlertController 检测/接受/关闭/输入 |
+| `open_url` | `url` | 打开 URL |
+| `shake` | — | 摇一摇事件 |
+| `app_state` | — | App 前后台状态 |
 | `screenshot` | `quality` 0小/1中/≥2原始 | 截图，返回 base64 PNG |
 | `record_start` | — | 开始录制（App 显示 ● REC 徽标） |
 | `record_stop` | — | 停止录制，返回 `{steps:[…], count}`（可 `stepsToDSL` 转 DSL） |
@@ -256,30 +329,35 @@ tap/长按/滑动按位移(≥14pt)与时长(≥0.45s)自动判定；输入通�
 ## 项目结构
 
 ```
-├── project.yml                  # xcodegen 定义（改结构后需 xcodegen generate）
-├── IUIAuto/
-│   ├── SupportingFiles/main.m / Info.plist(生成)
-│   ├── App/AppDelegate          # 启动即连接服务器；回前台自动重连
-│   ├── UI/DemoViewController    # 演示界面（计数按钮/输入框/滑块/滚动列表，均带 identifier）
+├── IUIAUTO.podspec              # CocoaPods 库定义（v0.3.0）
+├── Sources/
+│   ├── IUIAUTO.h                # 伞头
 │   ├── Core/
 │   │   ├── IUAWebSocketClient   # 通信层：心跳/重连/JSON 收发
 │   │   ├── IUACommandDispatcher # 调度层：串行 FIFO + 超时
 │   │   ├── IUACommand(Result)   # 指令/结果模型
-│   │   ├── IUAEngine            # 总控：路由 + 18 个动作注册
+│   │   ├── IUAEngine            # 总控：路由 + 40+ 个动作注册（含 Appium 元素/设备能力）
 │   │   ├── IUAConfiguration     # 服务器地址等配置(UserDefaults 持久化)
 │   │   └── IUALogger            # 日志(可转发到服务器)
-│   └── Actions/
-│       ├── IUATouchSynthesizer  # 触控合成（核心）
-│       ├── IUARecorder          # 操作录制(sendEvent + 派发点双路径钩子)
-│       ├── IUATextSynthesizer   # 文本输入(UIKeyInput)
-│       ├── IUAViewIntrospector  # view 树查询/定位
-│       └── IUAScreenshotService # 截图
+│   ├── Actions/
+│   │   ├── IUATouchSynthesizer  # 触控合成（核心）
+│   │   ├── IUARecorder          # 操作录制(sendEvent + 派发点双路径钩子)
+│   │   ├── IUATextSynthesizer   # 文本输入(UIKeyInput)
+│   │   ├── IUAElementQuery      # ★ Appium 定位策略/属性/XPath/page source XML
+│   │   ├── IUAViewIntrospector  # view 树查询/定位
+│   │   └── IUAScreenshotService # 窗口/元素截图
+│   └── UI/                      # 悬浮状态条 / 配置页
+├── Example/IUIAutoExample/      # 示例 App：Demo 控件（按钮/输入/滑块/列表/弹窗）
 └── Tools/                       # 控制端（Node）
-    ├── gui_server.js / gui.html # ★ GUI 控制台（浏览器可视化工作台）
+    ├── gui_server.js / gui.html # ★ GUI 控制台（含 Appium 元素/设备页；自动挂 4723 桥）
+    ├── appium_bridge.js         # ★ W3C WebDriver / Appium 兼容 HTTP 桥
+    ├── iua_webdriver_actions.js # ★ W3C Actions → 语义手势翻译
     ├── mock_server.js           # 控制服务器模拟器(交互/--demo 自动验证/rec 录制)
     ├── iua_dsl.js               # DSL 解析器 + 录制步骤→DSL 转换
     ├── iua_runner.js            # 脚本执行器共享模块(GUI/CLI 复用)
     ├── run_script.js            # 脚本执行器/录制器(断言+报告+exit code)
+    ├── appium_bridge_test.mjs   # Appium 桥单测（假 App，30 项）
+    ├── appium_e2e_test.mjs      # Appium 桥 + 模拟器真实 E2E（27 项）
     ├── record_test.mjs          # 录制功能端到端自检
     └── scripts/                 # GUI/CLI 共享的脚本库
 ```
@@ -295,7 +373,10 @@ tap/长按/滑动按位移(≥14pt)与时长(≥0.45s)自动判定；输入通�
 
 - Xcode 26.6 / iOS 26.5 模拟器（iPhone 17 Pro）
 - 指令链路端到端断言 12/12 通过：identifier 点击、坐标点击、计数联动、中文输入、提交联动、滑动滚动、截图、view 树导出
-- 录制回放闭环 6/6 通过：合成操作录制（tap×2/type_text/swipe 步骤数与内容精确校验）→ DSL 生成 → 回放 + 断言（`Count: 4` 验证录制与回放双向生效）
+- 录制回放闭环 6/6 通过：合成操作录制（tap×2/type_text/swipe 步骤数与内容精确校验）→ DSL 生成 → 回放 + 动态计数断言（验证录制与回放双向生效）
+- Appium 桥单测 30/30 通过（假 App：session/element/source/screenshot/W3C Actions/隐式等待/设备端点/mobile 命令）
+- Appium 桥 + 模拟器 E2E 27/27 通过（真实 UIKit 点击、输入、提交联动、弹窗、截图、W3C Actions、剪贴板/方向/键盘）
+- **WebdriverIO 10.2.0 真实客户端验证通过**：`remote` 建会话、`~` 定位、click、setValue、getPageSource、takeScreenshot、performActions、getAlertText/sendAlertText/acceptAlert、deleteSession
 
 ## Licenses
 

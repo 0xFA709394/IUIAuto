@@ -204,6 +204,17 @@
     [self.submitButton addTarget:self action:@selector(submitTapped)
                 forControlEvents:UIControlEventTouchUpInside];
 
+    UIButton *alertButton = [UIButton buttonWithType:UIButtonTypeSystem];
+    [alertButton setTitle:@"弹窗测试（Appium alert）" forState:UIControlStateNormal];
+    alertButton.accessibilityIdentifier = @"btn.alert";
+    alertButton.backgroundColor = [UIColor systemBlueColor];
+    alertButton.tintColor = UIColor.whiteColor;
+    alertButton.layer.cornerRadius = 6;
+    alertButton.titleLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightSemibold];
+    [alertButton.heightAnchor constraintEqualToConstant:36].active = YES;
+    [alertButton addTarget:self action:@selector(alertTapped)
+          forControlEvents:UIControlEventTouchUpInside];
+
     self.outputLabel = [[UILabel alloc] init];
     self.outputLabel.accessibilityIdentifier = @"label.output";
     self.outputLabel.text = @"提交内容: -";
@@ -219,7 +230,8 @@
     [self.submitButton setContentHuggingPriority:UILayoutPriorityRequired forAxis:UILayoutConstraintAxisHorizontal];
     [self.submitButton.widthAnchor constraintEqualToConstant:72].active = YES;
 
-    return [self cardViewWithTitle:@"文本输入（type_text / clear_text）" subviews:@[row, self.outputLabel]];
+    return [self cardViewWithTitle:@"文本输入（type_text / clear_text）"
+                          subviews:@[row, self.outputLabel, alertButton]];
 }
 
 - (UIView *)sliderSection {
@@ -320,6 +332,25 @@
     self.lastTouchLabel.text = [NSString stringWithFormat:@"btn.counter 点击 × %ld\n%@",
                                 (long)self.tapCount, [NSDate date].description];
     IUALogInfo(@"Demo: btn.counter 被点击（第 %ld 次）", (long)self.tapCount);
+}
+
+- (void)alertTapped {
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"自动化弹窗"
+                                                                   message:@"请输入内容，然后点确定"
+                                                            preferredStyle:UIAlertControllerStyleAlert];
+    [alert addTextFieldWithConfigurationHandler:^(UITextField * _Nonnull textField) {
+        textField.accessibilityIdentifier = @"field.alert";
+        textField.placeholder = @"弹窗输入";
+    }];
+    __weak typeof(self) weakSelf = self;
+    [alert addAction:[UIAlertAction actionWithTitle:@"取消" style:UIAlertActionStyleCancel handler:nil]];
+    [alert addAction:[UIAlertAction actionWithTitle:@"确定" style:UIAlertActionStyleDefault
+                                            handler:^(UIAlertAction * _Nonnull action) {
+        __strong typeof(weakSelf) strongSelf = weakSelf;
+        NSString *text = alert.textFields.firstObject.text ?: @"";
+        strongSelf.outputLabel.text = [NSString stringWithFormat:@"弹窗确认: %@", text];
+    }]];
+    [self presentViewController:alert animated:YES completion:nil];
 }
 
 - (void)submitTapped {

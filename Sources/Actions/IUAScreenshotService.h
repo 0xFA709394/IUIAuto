@@ -38,6 +38,10 @@ NS_ASSUME_NONNULL_BEGIN
 /// 返回 JSON: { image: <base64 PNG>, width, height, scale }
 + (nullable NSDictionary<NSString *, id> *)screenshotWithQuality:(NSUInteger)quality;
 
+/// 截取单个元素（Appium element screenshot）。
+/// 返回 JSON: { image: <base64 PNG>, width, height, scale }
++ (nullable NSDictionary<NSString *, id> *)screenshotOfView:(UIView *)view quality:(NSUInteger)quality;
+
 @end
 
 @interface IUAScreenshotService (Compare)

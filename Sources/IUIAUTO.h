@@ -36,6 +36,7 @@
 #import "IUATouchSynthesizer.h"
 #import "IUARecorder.h"
 #import "IUAPerfSampler.h"
+#import "IUAElementQuery.h"
 
 // 调试服务端配置页与悬浮状态条（UI 组件，按需使用）
 #import "IUAConfigViewController.h"

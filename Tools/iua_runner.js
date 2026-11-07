@@ -51,6 +51,41 @@ export async function runSteps(steps, send, onProgress = () => {}, opts = {}) {
       } else if (!r.ok) {
         detail = r.error || '失败';
       }
+    } else if (step.type === 'source') {
+      kind = 'action';
+      desc = `页面源码${step.file ? ` → ${step.file}` : ''}`;
+      const r = await send('page_source', {}, 30);
+      pass = r.ok;
+      if (r.ok) {
+        const source = r.data?.source ?? '';
+        detail = `${source.length} 字节`;
+        if (step.file && opts.shotSaver) {
+          try {
+            await opts.shotSaver(step.file, Buffer.from(source, 'utf8').toString('base64'));
+            detail += ` → ${step.file}`;
+          } catch (e) {
+            detail += `（保存失败: ${e.message}）`;
+          }
+        }
+      } else {
+        detail = r.error || '页面源码获取失败';
+      }
+    } else if (step.type === 'element_shot') {
+      kind = 'shot';
+      desc = `元素截图 ${step.locator?.using ?? ''}=${step.locator?.value ?? ''} → ${step.file}`;
+      const r = await send('element_screenshot', step.locator ?? {}, 30);
+      pass = r.ok;
+      if (r.ok && opts.shotSaver) {
+        try {
+          if (!r.data?.image) throw new Error('截图数据为空');
+          await opts.shotSaver(step.file, r.data.image);
+          detail = `${Math.round(r.data.width)}x${Math.round(r.data.height)}`;
+        } catch (e) {
+          detail = `截图数据获取成功但保存失败: ${e.message}`;
+        }
+      } else if (!r.ok) {
+        detail = r.error || '失败';
+      }
     } else if (step.type === 'look') {
       kind = 'assert';
       desc = `断言外观 ${step.name}（阈值 ${step.threshold}%）`;
@@ -59,7 +94,9 @@ export async function runSteps(steps, send, onProgress = () => {}, opts = {}) {
       detail = a.detail;
     } else if (step.type === 'assert') {
       kind = 'assert';
-      desc = `断言 ${step.kind} ${step.identifier} ${step.value ?? ''}`.trim();
+      desc = step.locator
+        ? `断言 ${step.kind} ${step.locator.using}=${step.locator.value} ${step.attribute ?? ''} ${step.value ?? ''}`.trim()
+        : `断言 ${step.kind} ${step.identifier} ${step.value ?? ''}`.trim();
       const a = await runAssert(step, send);
       pass = a.pass;
       detail = a.detail;
@@ -83,21 +120,61 @@ export async function runSteps(steps, send, onProgress = () => {}, opts = {}) {
 
 async function runAssert(step, send) {
   const { kind, identifier, value } = step;
+  const locator = step.locator;
+  const using = locator?.using ?? 'accessibility id';
+  const locatorValue = locator?.value ?? identifier;
+
   if (kind === 'exists' || kind === 'missing') {
-    const r = await send('element_info', { identifier });
+    const r = locator
+      ? await send('find_element', { using, value: locatorValue }, 20)
+      : await send('element_info', { identifier });
     return kind === 'exists'
       ? { pass: r.ok, detail: r.ok ? '存在' : '不存在' }
       : { pass: !r.ok, detail: r.ok ? '仍存在' : '不存在' };
   }
-  const r = await send('element_info', { identifier });
+
+  const r = locator
+    ? await send('find_element', { using, value: locatorValue }, 20)
+    : await send('element_info', { identifier });
   if (!r.ok) return { pass: false, detail: '元素不存在' };
+  const data = r.data ?? {};
+
+  if (kind === 'displayed' || kind === 'hidden') {
+    const visible = data.visible !== false && data.displayed !== false;
+    return kind === 'displayed'
+      ? { pass: visible, detail: visible ? '可见' : '不可见' }
+      : { pass: !visible, detail: visible ? '仍可见' : '已隐藏' };
+  }
+  if (kind === 'enabled' || kind === 'disabled') {
+    const enabled = data.enabled !== false;
+    return kind === 'enabled'
+      ? { pass: enabled, detail: enabled ? '可用' : '不可用' }
+      : { pass: !enabled, detail: enabled ? '仍可用' : '已禁用' };
+  }
+  if (kind === 'selected') {
+    const selected = data.selected === true;
+    return { pass: selected, detail: selected ? '已选中' : '未选中' };
+  }
+  if (kind === 'attribute_equals' || kind === 'attribute_contains') {
+    const attribute = step.attribute ?? '';
+    let actual = data[attribute];
+    if (actual === undefined) {
+      const attrResult = await send('element_action', {
+        using, value: locatorValue, action: 'get_attribute', attribute,
+      }, 20);
+      actual = attrResult.ok ? attrResult.data?.value : undefined;
+    }
+    const text = String(actual ?? '');
+    const pass = kind === 'attribute_equals' ? text === String(value) : text.includes(String(value));
+    return { pass, detail: `属性 ${attribute}="${text}" 期望="${value}"` };
+  }
   if (kind === 'value_equals' || kind === 'value_contains') {
     // 控件值断言（UISlider/UISwitch 等的 value 字段）
-    const v = String(r.data?.value ?? '');
+    const v = String(data.value ?? '');
     const pass = kind === 'value_equals' ? v === String(value) : v.includes(String(value));
     return { pass, detail: `实际值="${v}" 期望="${value}"` };
   }
-  const text = r.data?.text ?? '';
+  const text = data.text ?? '';
   return kind === 'text_contains'
     ? { pass: text.includes(value), detail: `实际="${text}"` }
     : { pass: text === value, detail: `实际="${text}" 期望="${value}"` };

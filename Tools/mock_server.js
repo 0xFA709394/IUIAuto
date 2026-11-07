@@ -250,6 +250,11 @@ async function runDemo() {
   const wait = (s) => new Promise(r => setTimeout(r, s * 1000));
   const info = async (id) => (await send('element_info', { identifier: id })).data;
 
+  // 0. 复位界面状态：收起键盘 + 滚动回顶部（保证脚本可重复运行）
+  await send('dismiss_keyboard');
+  await send('element_action', { using: 'accessibility id', value: 'scroll.demo', action: 'scroll_to_top' });
+  await wait(0.3);
+
   // 1. ping
   const ping = await send('ping');
   check('ping', ping.ok);
@@ -289,7 +294,8 @@ async function runDemo() {
   const field = await info('field.input');
   check('输入内容可见', field?.text === '自动化输入ABC123', `text="${field?.text}"`);
 
-  // 7. 点击提交按钮 → label.output 更新
+  // 7. 点击提交按钮 → label.output 更新（键盘可能遮挡，先收起）
+  await send('dismiss_keyboard');
   const submit = await send('tap_view', { identifier: 'btn.submit' });
   check('tap_view btn.submit', submit.ok);
   await wait(0.4);

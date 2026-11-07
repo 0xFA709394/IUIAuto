@@ -67,4 +67,42 @@ SOFTWARE.
     };
 }
 
++ (nullable NSDictionary<NSString *, id> *)screenshotOfView:(UIView *)view quality:(NSUInteger)quality {
+    if (!view || CGRectIsEmpty(view.bounds)) {
+        IUALogError(@"元素截图失败: view 为空或尺寸为 0");
+        return nil;
+    }
+    CGFloat scale = UIScreen.mainScreen.scale;
+    if (quality == 0) {
+        scale = MAX(scale * 0.3, 0.5);
+    } else if (quality == 1) {
+        scale = MAX(scale * 0.6, 1.0);
+    }
+
+    UIGraphicsImageRendererFormat *format = [UIGraphicsImageRendererFormat defaultFormat];
+    format.scale = scale;
+    UIGraphicsImageRenderer *renderer = [[UIGraphicsImageRenderer alloc]
+                                         initWithSize:view.bounds.size format:format];
+    UIImage *image = [renderer imageWithActions:^(UIGraphicsImageRendererContext * _Nonnull context) {
+        // 优先走视图层级快照；部分自定义 layer 不响应时退回 renderInContext
+        BOOL drawn = [view drawViewHierarchyInRect:view.bounds afterScreenUpdates:NO];
+        if (!drawn) {
+            [view.layer renderInContext:context.CGContext];
+        }
+    }];
+
+    NSData *pngData = UIImagePNGRepresentation(image);
+    if (!pngData) {
+        IUALogError(@"元素截图失败: PNG 编码失败");
+        return nil;
+    }
+    return @{
+        @"image" : [pngData base64EncodedStringWithOptions:0],
+        @"width" : @(image.size.width),
+        @"height" : @(image.size.height),
+        @"scale" : @(image.scale),
+        @"bytes" : @(pngData.length),
+    };
+}
+
 @end

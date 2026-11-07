@@ -1,0 +1,42 @@
+# Appium 能力回归示例（GUI「脚本」页可直接运行，CLI: node run_script.js appium_能力回归.txt）
+# 覆盖：定位策略 / 属性断言 / 元素状态 / 元素截图 / 页面源码 / 设备能力 / 弹窗
+
+滚动到顶
+
+# 1) accessibility id + 属性断言
+点击 btn.counter
+断言属性 id=label.counter text 包含 Count:
+
+# 2) class name / name 定位
+查找 class=UISlider
+断言属性 name=slider.demo value 等于 50
+
+# 3) 元素状态
+断言显示 label=提交
+断言可用 id=btn.submit
+
+# 4) iOS predicate 定位 + 输入（引号包住含空格的定位表达式）
+输入 "predicate=name == 'field.input'" 谓词输入
+断言属性 id=field.input value 等于 谓词输入
+追加输入 id=field.input 追加
+断言属性 id=field.input value 等于 谓词输入追加
+清空 id=field.input
+
+# 5) 弹窗（Demo 的「弹窗测试」按钮）
+点击 id=btn.alert
+弹窗 设置文本 弹窗内容
+弹窗 接受
+断言文本 id=label.output 包含 弹窗确认: 弹窗内容
+
+# 6) 元素截图 / 页面源码
+元素截图 id=btn.alert appium_element.png
+页面源码 appium_source.xml
+
+# 7) 滚动到顶/底 + 设备能力
+滚动到底
+滚动到顶
+剪贴板 设置 iuiauto-appium
+剪贴板 获取
+键盘状态
+应用状态
+摇一摇

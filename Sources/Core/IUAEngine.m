@@ -34,6 +34,7 @@ SOFTWARE.
 #import "IUAScreenshotService.h"
 #import "IUARecorder.h"
 #import "IUAPerfSampler.h"
+#import "IUAElementQuery.h"
 #import "IUAFloatingStatusBar.h"
 #import "IUAConfigViewController.h"
 
@@ -60,6 +61,217 @@ static UIResponder *IUACurrentFirstResponderForInput(void) {
     [UIApplication.sharedApplication sendAction:@selector(iua_engineCaptureFR:)
                                              to:nil from:nil forEvent:nil];
     return gIUAEngineCapturedFR;
+}
+
+#pragma mark - 设备 / 系统信息辅助
+
+static UIWindowScene *IUAKeyWindowScene(void) {
+    for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
+        if ([scene isKindOfClass:[UIWindowScene class]]) {
+            return (UIWindowScene *)scene;
+        }
+    }
+    return nil;
+}
+
+static NSString *IUAOrientationString(void) {
+    UIInterfaceOrientation orientation = UIInterfaceOrientationUnknown;
+    UIWindowScene *scene = IUAKeyWindowScene();
+    if (scene) {
+        orientation = scene.interfaceOrientation;
+    }
+    if (orientation == UIInterfaceOrientationUnknown) {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+        orientation = UIApplication.sharedApplication.statusBarOrientation;
+#pragma clang diagnostic pop
+    }
+    switch (orientation) {
+        case UIInterfaceOrientationLandscapeLeft:
+        case UIInterfaceOrientationLandscapeRight:
+            return @"LANDSCAPE";
+        case UIInterfaceOrientationPortrait:
+        case UIInterfaceOrientationPortraitUpsideDown:
+            return @"PORTRAIT";
+        default:
+            return @"PORTRAIT";
+    }
+}
+
+static NSString *IUASetOrientationString(NSString *requested) {
+    NSString *upper = (requested ?: @"").uppercaseString;
+    UIInterfaceOrientationMask mask = [upper containsString:@"LANDSCAPE"]
+        ? UIInterfaceOrientationMaskLandscape
+        : UIInterfaceOrientationMaskPortrait;
+    if (@available(iOS 16.0, *)) {
+        UIWindowScene *scene = IUAKeyWindowScene();
+        if (scene) {
+            UIWindowSceneGeometryPreferencesIOS *preferences =
+                [[UIWindowSceneGeometryPreferencesIOS alloc] initWithInterfaceOrientations:mask];
+            [scene requestGeometryUpdateWithPreferences:preferences errorHandler:^(NSError * _Nonnull error) {
+                IUALogWarn(@"旋转请求失败: %@", error.localizedDescription);
+            }];
+        }
+    } else {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+        @try {
+            UIInterfaceOrientation orientation = (mask == UIInterfaceOrientationMaskLandscape)
+                ? UIInterfaceOrientationLandscapeRight : UIInterfaceOrientationPortrait;
+            [UIDevice.currentDevice setValue:@(orientation) forKey:@"orientation"];
+            [UIViewController attemptRotationToDeviceOrientation];
+        } @catch (NSException *exception) {
+            IUALogWarn(@"旋转失败: %@", exception.reason);
+        }
+#pragma clang diagnostic pop
+    }
+    return IUAOrientationString();
+}
+
+static BOOL IUAKeyboardShown(void) {
+    for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
+        if (![scene isKindOfClass:[UIWindowScene class]]) continue;
+        for (UIWindow *window in ((UIWindowScene *)scene).windows) {
+            NSString *className = NSStringFromClass(window.class);
+            if ([className containsString:@"Keyboard"] || [className containsString:@"TextEffects"]) {
+                return YES;
+            }
+        }
+    }
+    // 没有键盘 window（模拟器/硬件键盘）时，有输入焦点仍视为逻辑键盘可见
+    UIResponder *first = IUACurrentFirstResponderForInput();
+    return [first conformsToProtocol:@protocol(UIKeyInput)];
+}
+
+static UIViewController *IUATopPresentedViewController(void) {
+    UIWindow *window = [IUAViewIntrospector keyWindow];
+    UIViewController *top = window.rootViewController;
+    while (top.presentedViewController && !top.presentedViewController.isBeingDismissed) {
+        top = top.presentedViewController;
+    }
+    return top;
+}
+
+static UIView * _Nullable IUAFindViewWithText(UIView *root, NSString *text) {
+    if (text.length == 0) return nil;
+    if ([root isKindOfClass:[UILabel class]] && [((UILabel *)root).text isEqualToString:text]) return root;
+    if ([root isKindOfClass:[UIButton class]] &&
+        [[((UIButton *)root) titleForState:UIControlStateNormal] isEqualToString:text]) return root;
+    for (UIView *subview in root.subviews) {
+        UIView *found = IUAFindViewWithText(subview, text);
+        if (found) return found;
+    }
+    return nil;
+}
+
+static UITextField * _Nullable IUAFindTextField(UIView *root) {
+    if ([root isKindOfClass:[UITextField class]]) return (UITextField *)root;
+    for (UIView *subview in root.subviews) {
+        UITextField *found = IUAFindTextField(subview);
+        if (found) return found;
+    }
+    return nil;
+}
+
+static UIView * _Nullable IUAControlForAlertAction(UIAlertController *alert, UIAlertAction *action) {
+    if (!alert || !action) return nil;
+    UIView *label = IUAFindViewWithText(alert.view, action.title ?: @"");
+    UIView *node = label;
+    // iOS 新版本的 alert 按钮是 _UIAlertControllerActionView（普通 UIView，不是 UIControl），
+    // 因此这里返回最近的可点击容器，最终由 tapView: 用 hitTest 校验并派发触控。
+    UIView *fallback = label ? label.superview : nil;
+    while (node && node != alert.view) {
+        if ([node isKindOfClass:[UIControl class]]) return node;
+        if ([NSStringFromClass(node.class) containsString:@"ActionView"]) return node;
+        if ([NSStringFromClass(node.class) containsString:@"FilledBackgroundView"]) return node;
+        node = node.superview;
+    }
+    if (fallback && fallback != alert.view) return fallback;
+
+    // 兜底：部分系统版本的 action view 不暴露 UILabel，按 accessibilityLabel 查找
+    NSMutableArray<UIView *> *queue = [NSMutableArray arrayWithObject:alert.view];
+    while (queue.count > 0) {
+        UIView *current = queue.firstObject;
+        [queue removeObjectAtIndex:0];
+        if ([current.accessibilityLabel isEqualToString:action.title ?: @""]) return current;
+        [queue addObjectsFromArray:current.subviews];
+    }
+    return nil;
+}
+
+static NSString *IUAISO8601Now(void) {
+    NSISO8601DateFormatter *formatter = [[NSISO8601DateFormatter alloc] init];
+    formatter.formatOptions = NSISO8601DateFormatWithInternetDateTime;
+    return [formatter stringFromDate:[NSDate date]] ?: @"";
+}
+
+static NSDictionary<NSString *, id> *IUADeviceInfoJSON(void) {
+    UIDevice *device = UIDevice.currentDevice;
+    if (!device.isBatteryMonitoringEnabled) {
+        device.batteryMonitoringEnabled = YES;
+    }
+    NSDictionary *info = NSBundle.mainBundle.infoDictionary ?: @{};
+    NSDictionary *environment = [IUAViewIntrospector environmentJSON];
+    UIWindow *window = [IUAViewIntrospector keyWindow];
+    CGRect screenBounds = UIScreen.mainScreen.bounds;
+    CGFloat statusBarHeight = 0;
+    UIWindowScene *scene = IUAKeyWindowScene();
+    if (@available(iOS 13.0, *)) {
+        statusBarHeight = scene.statusBarManager.statusBarFrame.size.height;
+    }
+    UIEdgeInsets insets = window.safeAreaInsets;
+
+    NSString *applicationStateText = @"unknown";
+    switch (UIApplication.sharedApplication.applicationState) {
+        case UIApplicationStateActive: applicationStateText = @"active"; break;
+        case UIApplicationStateInactive: applicationStateText = @"inactive"; break;
+        case UIApplicationStateBackground: applicationStateText = @"background"; break;
+        default: break;
+    }
+
+    NSString *batteryState = @"unknown";
+    switch (device.batteryState) {
+        case UIDeviceBatteryStateUnplugged: batteryState = @"unplugged"; break;
+        case UIDeviceBatteryStateCharging: batteryState = @"charging"; break;
+        case UIDeviceBatteryStateFull: batteryState = @"full"; break;
+        default: batteryState = @"unknown"; break;
+    }
+
+    return @{
+        @"agent" : @"IUIAuto",
+        @"version" : [IUAConfiguration agentVersion],
+        @"name" : device.name ?: @"",
+        @"model" : device.model ?: @"",
+        @"deviceModel" : environment[@"deviceModel"] ?: @"unknown",
+        @"systemName" : device.systemName ?: @"iOS",
+        @"systemVersion" : device.systemVersion ?: @"",
+        @"idiom" : @(device.userInterfaceIdiom),
+        @"bundleId" : info[@"CFBundleIdentifier"] ?: (NSBundle.mainBundle.bundleIdentifier ?: @""),
+        @"appName" : info[@"CFBundleDisplayName"] ?: info[@"CFBundleName"] ?: @"",
+        @"appVersion" : info[@"CFBundleShortVersionString"] ?: @"",
+        @"build" : info[@"CFBundleVersion"] ?: @"",
+        @"locale" : NSLocale.currentLocale.localeIdentifier ?: @"",
+        @"language" : NSLocale.preferredLanguages.firstObject ?: @"",
+        @"timeZone" : NSTimeZone.localTimeZone.name ?: @"",
+        @"time" : IUAISO8601Now(),
+        @"timestamp" : @(round(NSDate.date.timeIntervalSince1970 * 1000)),
+        @"orientation" : IUAOrientationString(),
+        @"screen" : @{@"width" : @(screenBounds.size.width),
+                      @"height" : @(screenBounds.size.height),
+                      @"scale" : @(UIScreen.mainScreen.scale)},
+        @"windowSize" : @{@"width" : @(window.bounds.size.width),
+                          @"height" : @(window.bounds.size.height)},
+        @"statusBarHeight" : @(statusBarHeight),
+        @"safeAreaInsets" : @{@"top" : @(insets.top),
+                              @"left" : @(insets.left),
+                              @"bottom" : @(insets.bottom),
+                              @"right" : @(insets.right)},
+        @"batteryLevel" : @(device.batteryLevel),
+        @"batteryState" : batteryState,
+        @"applicationState" : @(UIApplication.sharedApplication.applicationState),
+        @"applicationStateText" : applicationStateText,
+        @"keyboardShown" : @(IUAKeyboardShown()),
+    };
 }
 
 /// NSNumber 直接可用；NSString 必须能完整解析为数值（"12.5" ✓ "abc"/"12x" ✗）
@@ -109,10 +321,69 @@ static BOOL IUALoadPointFromIdentifier(NSString *identifier, CGPoint *outPoint, 
     return YES;
 }
 
+/// 从指令 params 解析元素定位参数（支持 xpath/identifier 简写；index 可负=倒数）
+static BOOL IUAResolveLocatorParams(NSDictionary<NSString *, id> *params,
+                                    NSString **outUsing,
+                                    NSString **outValue,
+                                    NSInteger *outIndex) {
+    NSString *using = [params[@"using"] isKindOfClass:[NSString class]] ? params[@"using"] : nil;
+    NSString *value = [params[@"value"] isKindOfClass:[NSString class]] ? params[@"value"] : nil;
+    NSString *xpath = [params[@"xpath"] isKindOfClass:[NSString class]] ? params[@"xpath"] : nil;
+    NSString *identifier = [params[@"identifier"] isKindOfClass:[NSString class]] ? params[@"identifier"] : nil;
+
+    if (xpath.length > 0) {
+        using = @"xpath";
+        value = xpath;
+    } else if (using.length == 0 && value.length == 0 && identifier.length > 0) {
+        using = @"accessibility id";
+        value = identifier;
+    }
+    if (using.length == 0 && value.length == 0) {
+        return NO;
+    }
+    if (using.length == 0) using = @"accessibility id";
+    if (value == nil) value = @"";
+
+    NSInteger index = 0;
+    id indexValue = params[@"index"];
+    if ([indexValue isKindOfClass:[NSNumber class]]) index = [indexValue integerValue];
+    else if ([indexValue isKindOfClass:[NSString class]]) index = [indexValue integerValue];
+
+    if (outUsing) *outUsing = using;
+    if (outValue) *outValue = value;
+    if (outIndex) *outIndex = index;
+    return YES;
+}
+
+static BOOL IUAValidateLocator(NSString *using, NSString *value, NSString * __autoreleasing *error) {
+    __autoreleasing NSString *validationError = nil;
+    BOOL valid = [IUAElementQuery validateUsing:using value:value error:&validationError];
+    if (!valid && error) *error = validationError;
+    return valid;
+}
+
 @interface IUAEngine () <IUAWebSocketClientDelegate>
 @property (nonatomic, strong, nullable) IUAWebSocketClient *client;
 @property (nonatomic, strong) IUACommandDispatcher *dispatcher;
 @property (nonatomic, assign) BOOL logForwardingInProgress; // 重入保护
+- (void)tapView:(UIView *)view
+    displayName:(NSString *)displayName
+       tapCount:(NSUInteger)tapCount
+        attempt:(NSUInteger)attempt
+     completion:(void (^)(BOOL, NSDictionary *, NSString *))finish;
+- (void)longPressView:(UIView *)view
+          displayName:(NSString *)displayName
+             duration:(NSTimeInterval)duration
+              attempt:(NSUInteger)attempt
+           completion:(void (^)(BOOL, NSDictionary *, NSString *))finish;
+- (void)waitForElementUsing:(NSString *)using
+                      value:(NSString *)value
+                      index:(NSInteger)index
+                disappearing:(BOOL)disappearing
+                    deadline:(NSDate *)deadline
+                      waited:(NSTimeInterval)waited
+                    interval:(NSTimeInterval)interval
+                  completion:(void (^)(BOOL, NSDictionary *, NSString *))finish;
 @end
 
 @implementation IUAEngine
@@ -440,6 +711,269 @@ static BOOL IUALoadPointFromIdentifier(NSString *identifier, CGPoint *outPoint, 
         finish(YES, [IUAViewIntrospector infoJSONForView:view maxDepth:2], nil);
     });
 
+    // ---- Appium 风格元素模型：定位策略 / 元素句柄 / 页面源码 / 元素级动作 ----
+    simple(@"find_elements", ^(IUACommand *cmd, void (^finish)(BOOL, NSDictionary *, NSString *)) {
+        NSString *using = nil, *value = nil;
+        NSInteger index = 0;
+        if (!IUAResolveLocatorParams(cmd.params, &using, &value, &index)) {
+            finish(NO, nil, @"find_elements 需要 params.using + params.value（或 params.xpath/identifier）");
+            return;
+        }
+        NSString *locatorError = nil;
+        if (!IUAValidateLocator(using, value, &locatorError)) {
+            finish(NO, nil, locatorError);
+            return;
+        }
+        NSArray<UIView *> *views = [IUAElementQuery findViewsUsing:using value:value];
+        NSInteger start = MAX(index, 0);
+        NSInteger limit = MAX([cmd integerParam:@"limit" default:100], 0);
+        finish(YES, [IUAElementQuery elementsJSONForViews:views start:start limit:limit using:using value:value], nil);
+    });
+
+    simple(@"find_element", ^(IUACommand *cmd, void (^finish)(BOOL, NSDictionary *, NSString *)) {
+        NSString *using = nil, *value = nil;
+        NSInteger index = 0;
+        if (!IUAResolveLocatorParams(cmd.params, &using, &value, &index)) {
+            finish(NO, nil, @"find_element 需要 params.using + params.value（或 params.xpath/identifier）");
+            return;
+        }
+        NSString *locatorError = nil;
+        if (!IUAValidateLocator(using, value, &locatorError)) {
+            finish(NO, nil, locatorError);
+            return;
+        }
+        UIView *view = [IUAElementQuery findViewUsing:using value:value index:index];
+        if (!view) {
+            finish(NO, @{@"using" : using, @"value" : value, @"index" : @(index)},
+                   [NSString stringWithFormat:@"no such element: %@=%@", using, value]);
+            return;
+        }
+        NSMutableDictionary *info = [[IUAElementQuery attributesForView:view] mutableCopy];
+        info[@"using"] = using;
+        info[@"locatorValue"] = value;
+        info[@"index"] = @(index);
+        finish(YES, info, nil);
+    });
+
+    simple(@"element_action", ^(IUACommand *cmd, void (^finish)(BOOL, NSDictionary *, NSString *)) {
+        NSString *using = nil, *value = nil;
+        NSInteger index = 0;
+        if (!IUAResolveLocatorParams(cmd.params, &using, &value, &index)) {
+            finish(NO, nil, @"element_action 需要元素定位参数（using/value 或 xpath/identifier）");
+            return;
+        }
+        NSString *locatorError = nil;
+        if (!IUAValidateLocator(using, value, &locatorError)) {
+            finish(NO, nil, locatorError);
+            return;
+        }
+        UIView *view = [IUAElementQuery findViewUsing:using value:value index:index];
+        if (!view) {
+            finish(NO, @{@"using" : using, @"value" : value, @"index" : @(index)},
+                   [NSString stringWithFormat:@"no such element: %@=%@", using, value]);
+            return;
+        }
+        NSString *displayName = [NSString stringWithFormat:@"%@=%@[%ld]", using, value, (long)index];
+        NSString *action = [[cmd stringParam:@"action"] lowercaseString] ?: @"click";
+        NSDictionary<NSString *, id> *attrs = [IUAElementQuery attributesForView:view];
+
+        if ([action isEqualToString:@"click"] || [action isEqualToString:@"tap"]) {
+            [self tapView:view displayName:displayName tapCount:1 attempt:0 completion:^(BOOL ok, NSDictionary *data, NSString *error) {
+                NSMutableDictionary *out = [data mutableCopy] ?: [NSMutableDictionary dictionary];
+                out[@"element"] = attrs;
+                finish(ok, out, error);
+            }];
+            return;
+        }
+        if ([action isEqualToString:@"double_click"] || [action isEqualToString:@"double_tap"] ||
+            [action isEqualToString:@"doubleclick"]) {
+            [self tapView:view displayName:displayName tapCount:2 attempt:0 completion:^(BOOL ok, NSDictionary *data, NSString *error) {
+                NSMutableDictionary *out = [data mutableCopy] ?: [NSMutableDictionary dictionary];
+                out[@"element"] = attrs;
+                out[@"doubleTapped"] = @(ok);
+                finish(ok, out, error);
+            }];
+            return;
+        }
+        if ([action isEqualToString:@"long_click"] || [action isEqualToString:@"long_press"] ||
+            [action isEqualToString:@"longclick"] || [action isEqualToString:@"touch_and_hold"]) {
+            double duration = [cmd floatParam:@"duration" default:0.8];
+            [self longPressView:view displayName:displayName duration:duration attempt:0 completion:^(BOOL ok, NSDictionary *data, NSString *error) {
+                NSMutableDictionary *out = [data mutableCopy] ?: [NSMutableDictionary dictionary];
+                out[@"element"] = attrs;
+                finish(ok, out, error);
+            }];
+            return;
+        }
+        if ([action isEqualToString:@"send_keys"] || [action isEqualToString:@"type"] ||
+            [action isEqualToString:@"set_text"] || [action isEqualToString:@"set_value"]) {
+            NSString *text = [cmd stringParam:@"text"];
+            if (text.length == 0) {
+                finish(NO, nil, @"send_keys 需要 params.text");
+                return;
+            }
+            IUATextSynthesizer *synthesizer = [[IUATextSynthesizer alloc] init];
+            void (^typeBlock)(void) = ^{
+                [synthesizer typeText:text intoView:view completion:^(NSError * _Nullable error) {
+                    error ? finish(NO, nil, error.localizedDescription)
+                          : finish(YES, @{@"typed" : @(text.length), @"text" : text, @"element" : attrs}, nil);
+                }];
+            };
+            if ([action isEqualToString:@"set_text"] || [action isEqualToString:@"set_value"]) {
+                [synthesizer clearTextInView:view completion:^(NSError * _Nullable error) {
+                    if (error) { finish(NO, nil, error.localizedDescription); return; }
+                    typeBlock();
+                }];
+            } else {
+                typeBlock();
+            }
+            return;
+        }
+        if ([action isEqualToString:@"clear"] || [action isEqualToString:@"clear_text"]) {
+            IUATextSynthesizer *synthesizer = [[IUATextSynthesizer alloc] init];
+            [synthesizer clearTextInView:view completion:^(NSError * _Nullable error) {
+                error ? finish(NO, nil, error.localizedDescription)
+                      : finish(YES, @{@"cleared" : @YES, @"element" : attrs}, nil);
+            }];
+            return;
+        }
+        if ([action isEqualToString:@"get_text"]) {
+            finish(YES, @{@"text" : attrs[@"text"] ?: @"", @"value" : attrs[@"value"] ?: @"", @"element" : attrs}, nil);
+            return;
+        }
+        if ([action isEqualToString:@"get_attribute"]) {
+            NSString *attribute = [cmd stringParam:@"attribute"];
+            if (attribute.length == 0) {
+                finish(NO, nil, @"get_attribute 需要 params.attribute");
+                return;
+            }
+            id result = [IUAElementQuery attributeForView:view name:attribute];
+            if (result == nil) {
+                finish(NO, nil, [NSString stringWithFormat:@"unknown attribute: %@", attribute]);
+                return;
+            }
+            finish(YES, @{@"attribute" : attribute, @"value" : result}, nil);
+            return;
+        }
+        if ([action isEqualToString:@"get_rect"]) {
+            finish(YES, attrs[@"rect"], nil);
+            return;
+        }
+        if ([action isEqualToString:@"get_attributes"]) {
+            finish(YES, attrs, nil);
+            return;
+        }
+        if ([action isEqualToString:@"is_displayed"] || [action isEqualToString:@"displayed"]) {
+            finish(YES, @{@"displayed" : attrs[@"visible"]}, nil);
+            return;
+        }
+        if ([action isEqualToString:@"is_enabled"] || [action isEqualToString:@"enabled"]) {
+            finish(YES, @{@"enabled" : attrs[@"enabled"]}, nil);
+            return;
+        }
+        if ([action isEqualToString:@"is_selected"] || [action isEqualToString:@"selected"]) {
+            finish(YES, @{@"selected" : attrs[@"selected"]}, nil);
+            return;
+        }
+        if ([action isEqualToString:@"is_focused"] || [action isEqualToString:@"focused"]) {
+            finish(YES, @{@"focused" : attrs[@"focused"]}, nil);
+            return;
+        }
+        if ([action isEqualToString:@"scroll_to"] || [action isEqualToString:@"scroll_to_visible"]) {
+            [self ensureViewVisible:view];
+            finish(YES, @{@"scrolledTo" : displayName, @"element" : attrs}, nil);
+            return;
+        }
+        if ([action isEqualToString:@"scroll_to_top"] || [action isEqualToString:@"scroll_to_bottom"]) {
+            UIScrollView *scrollView = [view isKindOfClass:[UIScrollView class]] ? (UIScrollView *)view : nil;
+            UIView *node = view;
+            while (!scrollView && node) {
+                if ([node isKindOfClass:[UIScrollView class]]) { scrollView = (UIScrollView *)node; break; }
+                node = node.superview;
+            }
+            if (!scrollView) {
+                finish(NO, nil, [NSString stringWithFormat:@"%@ 不在 UIScrollView 内", displayName]);
+                return;
+            }
+            CGFloat top = -scrollView.adjustedContentInset.top;
+            CGFloat bottom = MAX(top, scrollView.contentSize.height - scrollView.bounds.size.height + scrollView.adjustedContentInset.bottom);
+            CGFloat targetY = [action isEqualToString:@"scroll_to_top"] ? top : bottom;
+            [scrollView setContentOffset:CGPointMake(scrollView.contentOffset.x, targetY) animated:NO];
+            finish(YES, @{@"offsetY" : @(targetY), @"contentHeight" : @(scrollView.contentSize.height)}, nil);
+            return;
+        }
+        if ([action isEqualToString:@"screenshot"]) {
+            NSUInteger quality = (NSUInteger)[cmd integerParam:@"quality" default:1];
+            NSDictionary *shot = [IUAScreenshotService screenshotOfView:view quality:quality];
+            shot ? finish(YES, shot, nil) : finish(NO, nil, @"元素截图失败");
+            return;
+        }
+        finish(NO, nil, [NSString stringWithFormat:@"unknown element action: %@", action]);
+    });
+
+    simple(@"page_source", ^(IUACommand *cmd, void (^finish)(BOOL, NSDictionary *, NSString *)) {
+        NSInteger maxDepth = [cmd integerParam:@"maxDepth" default:0];
+        NSString *source = [IUAElementQuery pageSourceXMLWithMaxDepth:maxDepth];
+        finish(YES, @{@"source" : source, @"format" : @"xml", @"length" : @(source.length)}, nil);
+    });
+
+    simple(@"active_element", ^(IUACommand *cmd, void (^finish)(BOOL, NSDictionary *, NSString *)) {
+        UIView *active = [IUAElementQuery activeElement];
+        if (!active) {
+            finish(YES, @{@"found" : @NO}, nil);
+            return;
+        }
+        NSMutableDictionary *info = [[IUAElementQuery attributesForView:active] mutableCopy];
+        info[@"found"] = @YES;
+        finish(YES, info, nil);
+    });
+
+    simple(@"element_screenshot", ^(IUACommand *cmd, void (^finish)(BOOL, NSDictionary *, NSString *)) {
+        NSString *using = nil, *value = nil;
+        NSInteger index = 0;
+        if (!IUAResolveLocatorParams(cmd.params, &using, &value, &index)) {
+            finish(NO, nil, @"element_screenshot 需要元素定位参数");
+            return;
+        }
+        NSString *locatorError = nil;
+        if (!IUAValidateLocator(using, value, &locatorError)) {
+            finish(NO, nil, locatorError);
+            return;
+        }
+        UIView *view = [IUAElementQuery findViewUsing:using value:value index:index];
+        if (!view) {
+            finish(NO, nil, [NSString stringWithFormat:@"no such element: %@=%@", using, value]);
+            return;
+        }
+        NSUInteger quality = (NSUInteger)[cmd integerParam:@"quality" default:1];
+        NSDictionary *shot = [IUAScreenshotService screenshotOfView:view quality:quality];
+        shot ? finish(YES, shot, nil) : finish(NO, nil, @"元素截图失败");
+    });
+
+    simple(@"wait_for_element", ^(IUACommand *cmd, void (^finish)(BOOL, NSDictionary *, NSString *)) {
+        NSString *using = nil, *value = nil;
+        NSInteger index = 0;
+        if (!IUAResolveLocatorParams(cmd.params, &using, &value, &index)) {
+            finish(NO, nil, @"wait_for_element 需要元素定位参数");
+            return;
+        }
+        NSString *locatorError = nil;
+        if (!IUAValidateLocator(using, value, &locatorError)) {
+            finish(NO, nil, locatorError);
+            return;
+        }
+        BOOL disappearing = [[cmd stringParam:@"state"] isEqualToString:@"disappear"];
+        double timeout = MIN(MAX([cmd floatParam:@"timeout" default:10], 0.5), 60);
+        [self waitForElementUsing:using
+                            value:value
+                            index:index
+                      disappearing:disappearing
+                          deadline:[NSDate dateWithTimeIntervalSinceNow:timeout]
+                            waited:0
+                          interval:0.3
+                        completion:finish];
+    });
+
     // ---- 视觉回归：与基线图逐像素对比 ----
     simple(@"screenshot_compare", ^(IUACommand *cmd, void (^finish)(BOOL, NSDictionary *, NSString *)) {
         NSString *baseline = [cmd stringParam:@"baseline"];
@@ -613,9 +1147,164 @@ static BOOL IUALoadPointFromIdentifier(NSString *identifier, CGPoint *outPoint, 
         BOOL resigned = [window endEditing:YES];
         finish(YES, @{@"keyboardDismissed" : @(resigned)}, nil);
     });
+
+    // ---- 设备 / 系统能力（Appium 桥接常用端点）----
+    simple(@"device_info", ^(IUACommand *cmd, void (^finish)(BOOL, NSDictionary *, NSString *)) {
+        finish(YES, IUADeviceInfoJSON(), nil);
+    });
+
+    simple(@"orientation", ^(IUACommand *cmd, void (^finish)(BOOL, NSDictionary *, NSString *)) {
+        NSString *requested = [cmd stringParam:@"orientation"];
+        if (requested.length == 0) {
+            finish(YES, @{@"orientation" : IUAOrientationString(),
+                          @"requested" : IUAOrientationString()}, nil);
+            return;
+        }
+        IUASetOrientationString(requested);
+        // requestGeometryUpdate 是异步的，稍等一帧再读实际方向
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.35 * NSEC_PER_SEC)),
+                       dispatch_get_main_queue(), ^{
+            finish(YES, @{@"orientation" : IUAOrientationString(),
+                          @"requested" : requested}, nil);
+        });
+    });
+
+    simple(@"keyboard_state", ^(IUACommand *cmd, void (^finish)(BOOL, NSDictionary *, NSString *)) {
+        finish(YES, @{@"shown" : @(IUAKeyboardShown())}, nil);
+    });
+
+    simple(@"clipboard_get", ^(IUACommand *cmd, void (^finish)(BOOL, NSDictionary *, NSString *)) {
+        NSString *text = UIPasteboard.generalPasteboard.string ?: @"";
+        finish(YES, @{@"text" : text}, nil);
+    });
+
+    simple(@"clipboard_set", ^(IUACommand *cmd, void (^finish)(BOOL, NSDictionary *, NSString *)) {
+        NSString *text = [cmd stringParam:@"text"];
+        if (text == nil) {
+            finish(NO, nil, @"clipboard_set 需要 params.text");
+            return;
+        }
+        UIPasteboard.generalPasteboard.string = text;
+        finish(YES, @{@"text" : text}, nil);
+    });
+
+    simple(@"alert", ^(IUACommand *cmd, void (^finish)(BOOL, NSDictionary *, NSString *)) {
+        UIViewController *top = IUATopPresentedViewController();
+        UIAlertController *alert = [top isKindOfClass:[UIAlertController class]] ? (UIAlertController *)top : nil;
+        if (!alert) {
+            finish(NO, nil, @"no such alert");
+            return;
+        }
+        NSString *action = [[cmd stringParam:@"action"] lowercaseString] ?: @"get";
+        NSMutableArray<NSString *> *titles = [NSMutableArray array];
+        for (UIAlertAction *item in alert.actions) {
+            [titles addObject:item.title ?: @""];
+        }
+        NSMutableDictionary *base = [@{@"title" : alert.title ?: @"",
+                                       @"message" : alert.message ?: @"",
+                                       @"text" : alert.message ?: alert.title ?: @"",
+                                       @"buttons" : titles} mutableCopy];
+
+        if ([action isEqualToString:@"get"] || [action isEqualToString:@"buttons"] ||
+            [action isEqualToString:@"text"]) {
+            finish(YES, base, nil);
+            return;
+        }
+        if ([action isEqualToString:@"set_text"]) {
+            UITextField *field = IUAFindTextField(alert.view);
+            if (!field) {
+                finish(NO, nil, @"当前 alert 没有文本输入框");
+                return;
+            }
+            NSString *text = [cmd stringParam:@"text"] ?: @"";
+            IUATextSynthesizer *synthesizer = [[IUATextSynthesizer alloc] init];
+            [synthesizer clearTextInView:field completion:^(NSError * _Nullable error) {
+                if (error) { finish(NO, nil, error.localizedDescription); return; }
+                [synthesizer typeText:text intoView:field completion:^(NSError * _Nullable error2) {
+                    if (error2) { finish(NO, nil, error2.localizedDescription); return; }
+                    base[@"setText"] = text;
+                    finish(YES, base, nil);
+                }];
+            }];
+            return;
+        }
+        if (![action isEqualToString:@"accept"] && ![action isEqualToString:@"dismiss"]) {
+            finish(NO, nil, [NSString stringWithFormat:@"unknown alert action: %@", action]);
+            return;
+        }
+
+        UIAlertAction *target = nil;
+        if ([action isEqualToString:@"accept"]) {
+            for (UIAlertAction *item in alert.actions) {
+                if (item.style == UIAlertActionStyleDefault) { target = item; break; }
+            }
+            if (!target) target = alert.actions.firstObject;
+        } else {
+            for (UIAlertAction *item in alert.actions) {
+                if (item.style == UIAlertActionStyleCancel) { target = item; break; }
+            }
+            if (!target) {
+                target = alert.actions.count > 1 ? alert.actions.lastObject : alert.actions.firstObject;
+            }
+        }
+        if (!target) {
+            finish(NO, nil, @"alert 没有可点击的按钮");
+            return;
+        }
+        UIView *control = IUAControlForAlertAction(alert, target);
+        if (!control) {
+            finish(NO, nil, [NSString stringWithFormat:@"无法定位 alert 按钮: %@", target.title ?: @""]);
+            return;
+        }
+        NSString *buttonTitle = target.title ?: @"";
+        [self tapView:control displayName:[NSString stringWithFormat:@"alert[%@]", buttonTitle]
+             tapCount:1 attempt:0 completion:^(BOOL ok, NSDictionary *data, NSString *error) {
+            if (!ok) { finish(NO, nil, error); return; }
+            base[@"clickedButton"] = buttonTitle;
+            // 等 alert 关闭动画/action handler 执行完，避免脚本紧接着断言时读到旧值
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.6 * NSEC_PER_SEC)),
+                           dispatch_get_main_queue(), ^{
+                finish(YES, base, nil);
+            });
+        }];
+    });
+
+    simple(@"open_url", ^(IUACommand *cmd, void (^finish)(BOOL, NSDictionary *, NSString *)) {
+        NSString *urlString = [cmd stringParam:@"url"] ?: [cmd stringParam:@"text"];
+        NSURL *url = urlString.length > 0 ? [NSURL URLWithString:urlString] : nil;
+        if (!url) {
+            finish(NO, nil, @"open_url 需要合法的 params.url");
+            return;
+        }
+        [UIApplication.sharedApplication openURL:url options:@{} completionHandler:^(BOOL success) {
+            finish(success, @{@"url" : url.absoluteString ?: @""},
+                   success ? nil : @"openURL 被系统拒绝");
+        }];
+    });
+
+    simple(@"shake", ^(IUACommand *cmd, void (^finish)(BOOL, NSDictionary *, NSString *)) {
+        UIWindow *window = [IUAViewIntrospector keyWindow];
+        UIViewController *top = IUATopPresentedViewController();
+        if (window) {
+            [window motionEnded:UIEventSubtypeMotionShake withEvent:nil];
+        }
+        if (top) {
+            [top motionEnded:UIEventSubtypeMotionShake withEvent:nil];
+        }
+        finish(YES, @{@"shaken" : @YES}, nil);
+    });
+
+    simple(@"app_state", ^(IUACommand *cmd, void (^finish)(BOOL, NSDictionary *, NSString *)) {
+        UIApplicationState state = UIApplication.sharedApplication.applicationState;
+        NSInteger appiumState = state == UIApplicationStateBackground ? 3 : 4;
+        NSString *text = state == UIApplicationStateActive ? @"active"
+                        : state == UIApplicationStateInactive ? @"inactive" : @"background";
+        finish(YES, @{@"state" : @(appiumState), @"stateText" : text,
+                      @"bundleId" : NSBundle.mainBundle.bundleIdentifier ?: @""}, nil);
+    });
 }
 
-#pragma mark - identifier 点击（自动滚动到可视区 + 重试）
+#pragma mark - 元素点击（自动滚动到可视区 + 重试）
 
 /// 按 identifier 点击：元素不在可视区时先自动滚动到可见（沿祖先找 UIScrollView），
 /// 再执行触控；触控失败自动重试（等待滚动惯性/键盘动画结束）。
@@ -627,10 +1316,6 @@ static BOOL IUALoadPointFromIdentifier(NSString *identifier, CGPoint *outPoint, 
                tapCount:(NSUInteger)tapCount
                 attempt:(NSUInteger)attempt
              completion:(void (^)(BOOL, NSDictionary *, NSString *))finish {
-    if (attempt == 0) {
-        // 悬浮条避让：防止它遮挡点击目标（顶部区域元素）
-        [[IUAFloatingStatusBar sharedBar] yieldForInteraction];
-    }
     UIView *view = [IUAViewIntrospector findViewWithIdentifier:identifier];
     if (!view || view.hidden || view.alpha < 0.01) {
         // 系统键盘按键（identifier 形如 UIKeyboardLayout*）需要软件键盘真实显示才存在：
@@ -640,6 +1325,24 @@ static BOOL IUALoadPointFromIdentifier(NSString *identifier, CGPoint *outPoint, 
             return;
         }
         finish(NO, nil, [NSString stringWithFormat:@"找不到可见的 view: identifier=%@", identifier]);
+        return;
+    }
+    [self tapView:view displayName:identifier tapCount:tapCount attempt:attempt completion:finish];
+}
+
+/// 通用元素点击：元素级定位（xpath/class chain/predicate…）与 identifier 共用。
+/// 自动滚动到可视区、遮挡校验、触控失败重试。
+- (void)tapView:(UIView *)view
+    displayName:(NSString *)displayName
+       tapCount:(NSUInteger)tapCount
+        attempt:(NSUInteger)attempt
+     completion:(void (^)(BOOL, NSDictionary *, NSString *))finish {
+    if (attempt == 0) {
+        // 悬浮条避让：防止它遮挡点击目标（顶部区域元素）
+        [[IUAFloatingStatusBar sharedBar] yieldForInteraction];
+    }
+    if (!view || !view.window || view.hidden || view.alpha < 0.01) {
+        finish(NO, nil, [NSString stringWithFormat:@"找不到可见的 view: %@", displayName]);
         return;
     }
     [self ensureViewVisible:view];
@@ -659,12 +1362,12 @@ static BOOL IUALoadPointFromIdentifier(NSString *identifier, CGPoint *outPoint, 
         if (attempt + 1 < 10) {
             dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.4 * NSEC_PER_SEC)),
                            dispatch_get_main_queue(), ^{
-                [self tapIdentifier:identifier tapCount:tapCount attempt:attempt + 1 completion:finish];
+                [self tapView:view displayName:displayName tapCount:tapCount attempt:attempt + 1 completion:finish];
             });
             return;
         }
         finish(NO, nil, [NSString stringWithFormat:@"目标 %@ 被遮挡（命中 %@），请先关闭覆盖层（如配置页/弹窗）",
-                         identifier, NSStringFromClass(hit.class)]);
+                         displayName, NSStringFromClass(hit.class)]);
         return;
     }
     [[IUATouchSynthesizer shared] tapAtPoint:point tapCount:tapCount completion:^(NSError * _Nullable error) {
@@ -677,12 +1380,86 @@ static BOOL IUALoadPointFromIdentifier(NSString *identifier, CGPoint *outPoint, 
         if (attempt + 1 < 10) {
             dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.6 * NSEC_PER_SEC)),
                            dispatch_get_main_queue(), ^{
-                [self tapIdentifier:identifier tapCount:tapCount attempt:attempt + 1 completion:finish];
+                [self tapView:view displayName:displayName tapCount:tapCount attempt:attempt + 1 completion:finish];
             });
             return;
         }
         finish(NO, nil, error.localizedDescription);
     }];
+}
+
+/// 通用元素长按（元素级定位使用）。遮挡场景做一次 0.4s 重试。
+- (void)longPressView:(UIView *)view
+          displayName:(NSString *)displayName
+             duration:(NSTimeInterval)duration
+              attempt:(NSUInteger)attempt
+           completion:(void (^)(BOOL, NSDictionary *, NSString *))finish {
+    if (attempt == 0) {
+        [[IUAFloatingStatusBar sharedBar] yieldForInteraction];
+    }
+    if (!view || !view.window || view.hidden || view.alpha < 0.01) {
+        finish(NO, nil, [NSString stringWithFormat:@"找不到可见的 view: %@", displayName]);
+        return;
+    }
+    [self ensureViewVisible:view];
+    UIWindow *window = view.window ?: [IUAViewIntrospector keyWindow];
+    CGPoint point = [view convertPoint:CGPointMake(CGRectGetMidX(view.bounds), CGRectGetMidY(view.bounds))
+                                toView:window];
+    UIView *hit = [window hitTest:point withEvent:nil];
+    BOOL hitIsTargetOrChild = NO;
+    for (UIView *probe = hit; probe; probe = probe.superview) {
+        if (probe == view) { hitIsTargetOrChild = YES; break; }
+    }
+    if (!hitIsTargetOrChild) {
+        if (attempt + 1 < 5) {
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.4 * NSEC_PER_SEC)),
+                           dispatch_get_main_queue(), ^{
+                [self longPressView:view displayName:displayName duration:duration attempt:attempt + 1 completion:finish];
+            });
+            return;
+        }
+        finish(NO, nil, [NSString stringWithFormat:@"目标 %@ 被遮挡（命中 %@）", displayName, NSStringFromClass(hit.class)]);
+        return;
+    }
+    double clamped = MIN(MAX(duration, 0.1), 30.0);
+    [[IUATouchSynthesizer shared] longPressAtPoint:point duration:clamped completion:^(NSError * _Nullable error) {
+        error ? finish(NO, nil, error.localizedDescription)
+              : finish(YES, @{@"x" : @(point.x), @"y" : @(point.y), @"duration" : @(clamped)}, nil);
+    }];
+}
+
+/// wait_for_element 轮询：支持任意定位策略，不阻塞 UI
+- (void)waitForElementUsing:(NSString *)using
+                      value:(NSString *)value
+                      index:(NSInteger)index
+                disappearing:(BOOL)disappearing
+                    deadline:(NSDate *)deadline
+                      waited:(NSTimeInterval)waited
+                    interval:(NSTimeInterval)interval
+                  completion:(void (^)(BOOL, NSDictionary *, NSString *))finish {
+    BOOL exists = ([IUAElementQuery findViewUsing:using value:value index:index] != nil);
+    if (disappearing ? !exists : exists) {
+        finish(YES, @{@"using" : using,
+                      @"value" : value,
+                      @"index" : @(index),
+                      @"state" : disappearing ? @"disappeared" : @"appeared",
+                      @"waited" : @(round(waited * 10) / 10)}, nil);
+        return;
+    }
+    if ([NSDate.date compare:deadline] != NSOrderedAscending) {
+        finish(NO, nil, [NSString stringWithFormat:@"wait_for_element: %.1fs 内元素 %@=%@ 未%@",
+                         waited, using, value, disappearing ? @"消失" : @"出现"]);
+        return;
+    }
+    __weak typeof(self) weakSelf = self;
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(interval * NSEC_PER_SEC)),
+                   dispatch_get_main_queue(), ^{
+        __strong typeof(weakSelf) strongSelf = weakSelf;
+        [strongSelf waitForElementUsing:using value:value index:index
+                           disappearing:disappearing deadline:deadline
+                                 waited:waited + interval interval:interval
+                             completion:finish];
+    });
 }
 
 /// wait_for 轮询：主线程 dispatch_after 链，不阻塞 UI

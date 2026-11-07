@@ -79,6 +79,7 @@ fi
 cat <<EOF
 
 ✅ IUIAuto 控制台已启动: $URL
+   Appium 桥: http://localhost:4723 （标准 Appium 客户端可直接连接）
 
 快速上手（3 步）:
    1. 左侧「实时画面」确认 App 截图正常（顶部显示"已连接"）

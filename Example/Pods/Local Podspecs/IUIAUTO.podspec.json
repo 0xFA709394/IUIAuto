@@ -1,6 +1,6 @@
 {
   "name": "IUIAUTO",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "summary": "IUIAuto — iOS UI 自动化 Agent（进程内触控合成，不依赖 XCUITest）",
   "description": "通过 WebSocket 长连接接收控制服务器下发的 JSON 指令，在宿主 App 进程内\n模拟 UI 操作（点击/双击/长按/滑动/捏合/文本输入/元素查询/截图/录制/性能采样）。\n不依赖 XCUITest/XCTest runner，非越狱真机可用（开发证书即可）。\n合成触控仅作用于宿主 App 进程内（iOS 沙箱限制）。",
   "homepage": "https://github.com/0xFA709394/IUIAuto",
@@ -13,7 +13,7 @@
   },
   "source": {
     "git": "https://github.com/0xFA709394/IUIAuto.git",
-    "tag": "0.2.0"
+    "tag": "0.3.0"
   },
   "platforms": {
     "ios": "13.0"

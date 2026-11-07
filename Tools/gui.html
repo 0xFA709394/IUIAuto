@@ -92,6 +92,9 @@
   .cmd-chip { background: #f0f2f5; border: 1px solid var(--border); border-radius: 6px; padding: 4px 10px; font-family: var(--mono); font-size: 11.5px; cursor: pointer; }
   .cmd-chip:hover { background: #e3f0ff; border-color: var(--blue); }
   .cmd-chip .tip { font-family: -apple-system, sans-serif; color: var(--muted); font-size: 10.5px; margin-left: 4px; }
+  .loc-result { white-space: pre-wrap; font-family: var(--mono); font-size: 12px; background: #f7f8fa; border: 1px solid var(--border); border-radius: 8px; padding: 10px; max-height: 320px; overflow: auto; }
+  .loc-item { border-bottom: 1px solid var(--border); padding: 6px 0; }
+  .loc-item:last-child { border-bottom: none; }
 </style>
 </head>
 <body>
@@ -125,6 +128,7 @@
       <button class="active" data-tab="manual">手动操作</button>
       <button data-tab="record">录制</button>
       <button data-tab="scripts">脚本</button>
+      <button data-tab="appium">Appium</button>
       <button data-tab="report">报告</button>
       <button data-tab="logs">日志</button>
     </nav>
@@ -223,6 +227,76 @@
         </div>
       </div>
 
+      <!-- Appium 元素 / 设备 -->
+      <div class="tab-pane" id="tab-appium">
+        <div class="card">
+          <h3>WebDriver 桥</h3>
+          <div class="row">
+            <span class="inline">标准 Appium 客户端连接地址：<code id="appiumBridgeUrl">http://localhost:4723</code>（capabilities: platformName=iOS, appium:automationName=IUIAuto）</span>
+          </div>
+        </div>
+        <div class="card">
+          <h3>元素定位（Appium 策略）</h3>
+          <div class="row">
+            <select id="locStrategy" title="定位策略">
+              <option value="accessibility id">accessibility id</option>
+              <option value="name">name</option>
+              <option value="label">label</option>
+              <option value="text">text</option>
+              <option value="class name">class name</option>
+              <option value="xpath">xpath</option>
+              <option value="-ios predicate string">-ios predicate string</option>
+              <option value="-ios class chain">-ios class chain</option>
+            </select>
+            <input type="text" id="locValue" placeholder="如 btn.counter / //XCUIElementTypeButton[@name=&quot;btn.counter&quot;]" style="flex:1;min-width:260px">
+            <label class="inline">index</label><input type="number" id="locIndex" value="0" style="width:64px">
+            <button class="btn primary" onclick="locatorFind()">查找</button>
+          </div>
+          <div class="row">
+            <button class="btn" onclick="locatorAction('click')">点击</button>
+            <button class="btn" onclick="locatorAction('get_text')">读取文本</button>
+            <button class="btn" onclick="locatorAction('get_attributes')">属性</button>
+            <button class="btn" onclick="locatorAction('screenshot')">元素截图</button>
+            <button class="btn" onclick="locatorAction('scroll_to')">滚动到</button>
+            <label class="inline">操作作用于上方 index 匹配项</label>
+          </div>
+          <div id="locResult" class="loc-result">输入策略和值后点「查找」；xpath / predicate / class chain 可直接粘贴 Appium 表达式</div>
+        </div>
+        <div class="card">
+          <h3>页面源码（Appium page source XML）</h3>
+          <div class="row">
+            <button class="btn primary" onclick="loadSource()">获取 XML</button>
+            <button class="btn" onclick="downloadSource()">下载</button>
+            <span id="sourceInfo" class="inline"></span>
+          </div>
+          <textarea id="sourceView" readonly placeholder="点击「获取 XML」…" style="min-height:200px"></textarea>
+        </div>
+        <div class="card">
+          <h3>设备 / 系统能力</h3>
+          <div class="row">
+            <button class="btn" onclick="deviceAction('device_info')">设备信息</button>
+            <button class="btn" onclick="deviceAction('orientation')">读取方向</button>
+            <button class="btn" onclick="deviceAction('orientation','PORTRAIT')">竖屏</button>
+            <button class="btn" onclick="deviceAction('orientation','LANDSCAPE')">横屏</button>
+            <button class="btn" onclick="deviceAction('keyboard_state')">键盘状态</button>
+            <button class="btn" onclick="deviceAction('app_state')">应用状态</button>
+            <button class="btn" onclick="deviceAction('shake')">摇一摇</button>
+          </div>
+          <div class="row">
+            <input type="text" id="clipText" placeholder="剪贴板内容" style="flex:1;min-width:200px">
+            <button class="btn" onclick="clipboardSet()">写入剪贴板</button>
+            <button class="btn" onclick="clipboardGet()">读取剪贴板</button>
+          </div>
+          <div class="row">
+            <button class="btn" onclick="alertAction('accept')">弹窗接受</button>
+            <button class="btn" onclick="alertAction('dismiss')">弹窗关闭</button>
+            <button class="btn" onclick="alertAction('get')">弹窗文本</button>
+            <button class="btn" onclick="deviceAction('dismiss_keyboard')">收起键盘</button>
+          </div>
+          <pre id="deviceResult" class="loc-result">设备操作结果显示在这里…</pre>
+        </div>
+      </div>
+
       <!-- 报告 -->
       <div class="tab-pane" id="tab-report">
         <div class="card">
@@ -263,6 +337,8 @@ let currentScript = null; // 当前加载的脚本名
 
 // ---------------------------------------------------------------- WebSocket
 function connect() {
+  const bridgeEl = document.getElementById('appiumBridgeUrl');
+  if (bridgeEl) bridgeEl.textContent = `http://${location.hostname || 'localhost'}:4723`;
   ws = new WebSocket(`ws://${location.host}/ws`);
   ws.onopen = () => { refreshShot(0); loadTree(); send({ type: 'dsl_list' }); };
   ws.onmessage = (ev) => {
@@ -527,6 +603,93 @@ function scriptRun() {
          xctrace: document.getElementById('optXctrace').checked });
 }
 
+// ---------------------------------------------------------------- Appium 元素 / 设备
+let locatorMatches = [];
+
+function locatorParams() {
+  return {
+    using: document.getElementById('locStrategy').value,
+    value: val('locValue'),
+    index: Math.max(0, parseInt(val('locIndex') || '0', 10) || 0),
+  };
+}
+async function locatorFind() {
+  const params = locatorParams();
+  if (!params.value) { toast('请填写定位值', 'err'); return; }
+  const reply = await rpc({ type: 'send', action: 'find_elements', params: { ...params, limit: 100 } });
+  const box = document.getElementById('locResult');
+  if (!reply.ok) { box.textContent = '查找失败: ' + (reply.error || ''); return; }
+  locatorMatches = reply.data?.elements ?? [];
+  const lines = [`定位策略: ${params.using}   值: ${params.value}   共 ${reply.data?.count ?? locatorMatches.length} 个匹配`];
+  locatorMatches.slice(0, 30).forEach((el, i) => {
+    const r = el.rect || {};
+    lines.push(`\n[${i}] ${el.type}  name=${el.name || '-'}  label=${el.label || '-'}  value=${String(el.value ?? '-').slice(0, 40)}`);
+    lines.push(`    id=${el.identifier || '-'}  rect=(${Math.round(r.x)},${Math.round(r.y)} ${Math.round(r.width)}x${Math.round(r.height)})  visible=${el.visible}`);
+    if (el.xpath) lines.push(`    xpath=${el.xpath}`);
+  });
+  box.textContent = lines.join('\n');
+}
+async function locatorAction(action) {
+  const params = locatorParams();
+  if (!params.value) { toast('请填写定位值', 'err'); return; }
+  const reply = await rpc({ type: 'send', action: 'element_action', params: { ...params, action } });
+  const box = document.getElementById('locResult');
+  if (action === 'screenshot' && reply.ok && reply.data?.image) {
+    box.innerHTML = `<div>元素截图 ${Math.round(reply.data.width)}x${Math.round(reply.data.height)}</div><img style="max-width:100%;border:1px solid var(--border);border-radius:6px;margin-top:8px" src="data:image/png;base64,${reply.data.image}">`;
+  } else {
+    box.textContent = reply.ok
+      ? `✓ ${action}\n` + JSON.stringify(reply.data, null, 2).slice(0, 4000)
+      : `✗ ${action}: ${reply.error || '失败'}`;
+  }
+  if (action === 'click') setTimeout(() => refreshShot(0), 400);
+}
+async function loadSource() {
+  const reply = await rpc({ type: 'send', action: 'page_source', params: {} });
+  if (!reply.ok) { toast(reply.error || '获取源码失败', 'err'); return; }
+  const source = reply.data?.source ?? '';
+  document.getElementById('sourceView').value = source;
+  document.getElementById('sourceInfo').textContent = `${source.length} 字节 · ${source.split('\n').length} 行`;
+  toast('页面源码已获取', 'ok');
+}
+function downloadSource() {
+  const source = document.getElementById('sourceView').value;
+  if (!source) { toast('请先获取页面源码', 'err'); return; }
+  const blob = new Blob([source], { type: 'application/xml' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `page_source_${Date.now()}.xml`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+async function deviceAction(action, orientation) {
+  const params = orientation ? { orientation } : {};
+  const reply = await rpc({ type: 'send', action, params });
+  document.getElementById('deviceResult').textContent = reply.ok
+    ? JSON.stringify(reply.data ?? {}, null, 2).slice(0, 6000)
+    : `✗ ${action}: ${reply.error || '失败'}`;
+  if (action === 'orientation') setTimeout(() => refreshShot(0), 500);
+}
+async function clipboardSet() {
+  const text = val('clipText');
+  const reply = await rpc({ type: 'send', action: 'clipboard_set', params: { text } });
+  document.getElementById('deviceResult').textContent = reply.ok ? `✓ 已写入剪贴板: ${text}` : `✗ ${reply.error}`;
+}
+async function clipboardGet() {
+  const reply = await rpc({ type: 'send', action: 'clipboard_get', params: {} });
+  if (reply.ok) {
+    document.getElementById('clipText').value = reply.data?.text ?? '';
+    document.getElementById('deviceResult').textContent = `剪贴板: ${reply.data?.text ?? ''}`;
+  } else {
+    document.getElementById('deviceResult').textContent = `✗ ${reply.error}`;
+  }
+}
+async function alertAction(action) {
+  const reply = await rpc({ type: 'send', action: 'alert', params: { action } });
+  document.getElementById('deviceResult').textContent = reply.ok
+    ? JSON.stringify(reply.data ?? {}, null, 2)
+    : `✗ 弹窗操作失败: ${reply.error || '失败'}`;
+}
+
 // ---------------------------------------------------------------- 报告 & 日志
 function addReportRow(r) {
   const tbody = document.querySelector('#reportTable tbody');
@@ -612,6 +775,17 @@ const DSL_COMMANDS = [
   { ins: '断言文本 label.counter 等于 Count: 1', tip: '等于' },
   { ins: '断言存在 btn.submit', tip: '' },
   { ins: '断言不存在 btn.gone', tip: '' },
+  { ins: '点击 xpath=//XCUIElementTypeButton[@name="btn.counter"]', tip: 'XPath' },
+  { ins: '输入 "predicate=name == \'field.input\'" 文本', tip: '谓词定位' },
+  { ins: '查找 class=UISlider', tip: '元素查询' },
+  { ins: '断言属性 id=slider.demo value 等于 50', tip: '属性断言' },
+  { ins: '断言显示 label=提交', tip: '' },
+  { ins: '等待出现 chain=**/XCUIElementTypeButton 5', tip: 'class chain' },
+  { ins: '元素截图 xpath=//XCUIElementTypeButton[@name="btn.counter"] shot.png', tip: '' },
+  { ins: '页面源码', tip: '' },
+  { ins: '剪贴板 设置 文本', tip: '' },
+  { ins: '旋转 横屏', tip: '' },
+  { ins: '弹窗 接受', tip: '' },
 ];
 (function renderCmds() {
   const grid = document.getElementById('cmdGrid');

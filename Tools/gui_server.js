@@ -12,6 +12,7 @@
  *   - /app  App WebSocket（同 mock_server 的指令协议，9800 端口独立路径）
  *   - Tools/scripts/ 下的 DSL 脚本存储（列表/保存/读取/删除）
  *   - 复用 iua_runner.runSteps 执行脚本，进度实时推给浏览器
+ *   - 自动在 4723 启动 Appium/W3C WebDriver 桥（与 GUI 共用 App 连接）
  */
 
 import { createServer } from 'node:http';
@@ -23,6 +24,7 @@ import { parseScript, stepsToDSL, DSL_HELP } from './iua_dsl.js';
 import { runSteps } from './iua_runner.js';
 import { startXctraceRecording } from './iua_perf.js';
 import { ensurePortFree, handleListenError } from './iua_ports.js';
+import { createAppiumBridge } from './appium_bridge.js';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 const execFileAsync = promisify(execFile);
@@ -38,6 +40,7 @@ async function detectBootedSimulator() {
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const HTTP_PORT = +(process.env.PORT || 9900);
 const APP_PORT = +(process.env.APP_PORT || 9800);
+const BRIDGE_PORT = +(process.env.BRIDGE_PORT || 4723);
 const DEVELOPER_DIR = process.env.DEVELOPER_DIR || '/Applications/Xcode.app/Contents/Developer';
 const SCRIPTS_DIR = join(__dirname, 'scripts');
 if (!existsSync(SCRIPTS_DIR)) mkdirSync(SCRIPTS_DIR, { recursive: true });
@@ -256,6 +259,29 @@ httpServer.on('error', (e) => handleListenError(e, HTTP_PORT));
 httpServer.listen(HTTP_PORT, () => {
   console.log(`[gui] 控制台已启动: http://localhost:${HTTP_PORT}`);
 });
+
+// ---------------------------------------------------------------- Appium / WebDriver 桥（与 GUI 共存）
+// 标准 Appium 客户端可直接连接 http://localhost:4723；App 连接仍由本进程统一持有。
+let appiumBridge = null;
+try {
+  appiumBridge = createAppiumBridge({
+    send: sendToApp,
+    getHello: () => appHello,
+    log: (...values) => console.log('[gui][appium]', ...values),
+  });
+  appiumBridge.server.on('error', (e) => {
+    if (e.code === 'EADDRINUSE') {
+      console.log(`[gui] ⚠ Appium 桥端口 ${BRIDGE_PORT} 已被占用，已跳过（可设置 BRIDGE_PORT 更换端口）`);
+    } else {
+      console.log('[gui] Appium 桥错误:', e.message);
+    }
+  });
+  appiumBridge.server.listen(BRIDGE_PORT, () => {
+    console.log(`[gui] Appium 桥已启动: http://localhost:${BRIDGE_PORT}`);
+  });
+} catch (e) {
+  console.log('[gui] Appium 桥初始化失败:', e.message);
+}
 
 // ---------------------------------------------------------------- 启动环境自检（新手引导）
 (async () => {

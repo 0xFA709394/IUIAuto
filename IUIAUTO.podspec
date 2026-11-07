@@ -1,6 +1,6 @@
 Pod::Spec.new do |s|
   s.name             = 'IUIAUTO'
-  s.version          = '0.2.1'
+  s.version          = '0.3.0'
   s.summary          = 'IUIAuto — iOS UI 自动化 Agent（进程内触控合成，不依赖 XCUITest）'
   s.description      = <<-DESC
     通过 WebSocket 长连接接收控制服务器下发的 JSON 指令，在宿主 App 进程内

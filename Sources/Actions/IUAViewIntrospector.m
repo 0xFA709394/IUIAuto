@@ -178,11 +178,29 @@ SOFTWARE.
     UIScreen *screen = UIScreen.mainScreen;
     UIWindow *window = [self keyWindow];
     CGSize size = window ? window.bounds.size : screen.bounds.size;
+    NSDictionary *info = NSBundle.mainBundle.infoDictionary ?: @{};
+
+    NSString *orientation = @"PORTRAIT";
+    for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
+        if (![scene isKindOfClass:[UIWindowScene class]]) continue;
+        UIInterfaceOrientation value = ((UIWindowScene *)scene).interfaceOrientation;
+        if (value == UIInterfaceOrientationLandscapeLeft || value == UIInterfaceOrientationLandscapeRight) {
+            orientation = @"LANDSCAPE";
+        }
+        break;
+    }
+
     return @{
         @"agent" : @"IUIAuto",
         @"version" : [IUAConfiguration agentVersion],
         @"systemVersion" : UIDevice.currentDevice.systemVersion,
         @"deviceModel" : [self deviceModelIdentifier],
+        @"deviceName" : UIDevice.currentDevice.name ?: @"",
+        @"bundleId" : info[@"CFBundleIdentifier"] ?: (NSBundle.mainBundle.bundleIdentifier ?: @""),
+        @"appName" : info[@"CFBundleDisplayName"] ?: info[@"CFBundleName"] ?: @"",
+        @"appVersion" : info[@"CFBundleShortVersionString"] ?: @"",
+        @"build" : info[@"CFBundleVersion"] ?: @"",
+        @"orientation" : orientation,
         @"screen" : @{@"width" : @(size.width),
                       @"height" : @(size.height),
                       @"scale" : @(screen.scale)},
