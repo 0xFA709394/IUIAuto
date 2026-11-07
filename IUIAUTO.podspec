@@ -21,7 +21,7 @@ Pod::Spec.new do |s|
   
   # 库源码 = Core（通信/调度/总控）+ Actions（触控合成/录制/文本/查询/截图/性能采样）
   # 不含 demo App 壳（App/UI/SupportingFiles）
-  s.source_files = 'Sources/IUIAUTO.h', 'Sources/Core/**/*.{h,m}', 'Sources/Actions/**/*.{h,m}', 'Sources/UI/**/*.{h,m}'
+  s.source_files = 'Sources/IUIAUTO.h', 'Sources/IUIAUTOVersion.m', 'Sources/Core/**/*.{h,m}', 'Sources/Actions/**/*.{h,m}', 'Sources/UI/**/*.{h,m}'
   # 全部头设为 public：public 头之间存在互引（如 IUACommandDispatcher.h → IUACommand.h），
   # 任何被 public 头 import 的头若不在 public 列表，宿主在 framework 模式下展开伞头链时会报
   # 'xxx.h' file not found。纯 OC 库统一全公开最稳妥。

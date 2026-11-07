@@ -343,11 +343,12 @@
         textField.placeholder = @"弹窗输入";
     }];
     __weak typeof(self) weakSelf = self;
+    __weak UIAlertController *weakAlert = alert;
     [alert addAction:[UIAlertAction actionWithTitle:@"取消" style:UIAlertActionStyleCancel handler:nil]];
     [alert addAction:[UIAlertAction actionWithTitle:@"确定" style:UIAlertActionStyleDefault
                                             handler:^(UIAlertAction * _Nonnull action) {
         __strong typeof(weakSelf) strongSelf = weakSelf;
-        NSString *text = alert.textFields.firstObject.text ?: @"";
+        NSString *text = weakAlert.textFields.firstObject.text ?: @"";
         strongSelf.outputLabel.text = [NSString stringWithFormat:@"弹窗确认: %@", text];
     }]];
     [self presentViewController:alert animated:YES completion:nil];
@@ -372,6 +373,10 @@
                            [NSCharacterSet whitespaceAndNewlineCharacterSet]];
     if (urlString.length == 0) {
         self.statusLabel.text = @"请输入服务器地址";
+        return;
+    }
+    if (![IUAConfiguration isValidServerURLString:urlString]) {
+        self.statusLabel.text = @"地址无效（需要 ws:// 或 wss://）";
         return;
     }
     self.statusLabel.text = @"正在连接…";

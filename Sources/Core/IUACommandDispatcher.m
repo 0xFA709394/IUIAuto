@@ -93,7 +93,7 @@ NSString *const IUACommandDispatcherBusyDidChangeNotification = @"IUACommandDisp
                                                             errorText:[NSString stringWithFormat:@"unknown action: %@", command.action]
                                                                elapsed:0];
         completion(result);
-        [self drainOnMainThread];
+        dispatch_async(dispatch_get_main_queue(), ^{ [self drainOnMainThread]; });
         return;
     }
 
@@ -105,7 +105,7 @@ NSString *const IUACommandDispatcherBusyDidChangeNotification = @"IUACommandDisp
     __block BOOL finished = NO;
     __weak typeof(self) weakSelf = self;
 
-    void (^finish)(BOOL, NSDictionary *, NSString *) = ^(BOOL ok, NSDictionary<NSString *, id> * _Nullable data, NSString * _Nullable errorMessage) {
+    void (^finishOnMain)(BOOL, NSDictionary *, NSString *) = ^(BOOL ok, NSDictionary<NSString *, id> * _Nullable data, NSString * _Nullable errorMessage) {
         if (finished) {
             IUALogWarn(@"指令 %@(%@) 迟到结果已丢弃", command.commandId, command.action);
             return;
@@ -122,11 +122,27 @@ NSString *const IUACommandDispatcherBusyDidChangeNotification = @"IUACommandDisp
         __strong typeof(weakSelf) strongSelf = weakSelf;
         strongSelf.executing = NO;
         [strongSelf postBusyChange:NO];
-        [strongSelf drainOnMainThread];
+        // 异步展开下一条，避免大量同步完成的指令造成递归栈增长
+        dispatch_async(dispatch_get_main_queue(), ^{ [strongSelf drainOnMainThread]; });
+    };
+    void (^finish)(BOOL, NSDictionary *, NSString *) = ^(BOOL ok, NSDictionary<NSString *, id> * _Nullable data, NSString * _Nullable errorMessage) {
+        // 所有 handler 完成回调统一回主线程；避免 open_url 等第三方回调线程破坏队列状态
+        if ([NSThread isMainThread]) {
+            finishOnMain(ok, data, errorMessage);
+        } else {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                finishOnMain(ok, data, errorMessage);
+            });
+        }
     };
 
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(command.timeout * NSEC_PER_SEC)),
                    dispatch_get_main_queue(), ^{
+        // 正常完成时超时 guard 仍会到期；先检查再调用，避免每条成功指令都产生
+        // "迟到结果已丢弃" 的误报警告（真正的迟到结果由 finish 内部记录）
+        if (finished) {
+            return;
+        }
         finish(NO, nil, [NSString stringWithFormat:@"timeout after %.1fs", command.timeout]);
     });
 

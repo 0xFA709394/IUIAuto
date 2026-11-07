@@ -15,7 +15,7 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-BUNDLE_ID="com.iuiauto.example"
+BUNDLE_ID="${IUA_BUNDLE_ID:-com.iuiauto.example}"
 EXAMPLE_DIR=Example
 
 # ---- Xcode 环境（xcode-select 指向 CommandLineTools 时自动纠正）----
@@ -49,7 +49,8 @@ if [ "$UDID" = "--boot-only" ] || [ -z "$UDID" ]; then
   # 选择顺序：IUA_UDID 环境变量 > 第一台 booted > 第一台 available iPhone
   UDID="${IUA_UDID:-}"
   if [ -z "$UDID" ]; then
-    UDID=$(xcrun simctl list devices booted | grep -oE '\([0-9A-F-]{36}\)' | head -1 | tr -d '()')
+    # 只从 iOS 段选择设备，避免误选同时 booted 的 visionOS 模拟器
+    UDID=$(xcrun simctl list devices booted | sed -n '/-- iOS/,/^-- /p' | grep -oE '\([0-9A-F-]{36}\)' | head -1 | tr -d '()')
   fi
   if [ -z "$UDID" ]; then
     UDID=$(xcrun simctl list devices available | grep "iPhone" | grep -oE '\([0-9A-F-]{36}\)' | head -1 | tr -d '()')

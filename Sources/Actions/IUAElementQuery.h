@@ -62,7 +62,7 @@ FOUNDATION_EXPORT NSString *const IUAElementStrategyClassChain;
 + (NSArray<NSString *> *)supportedStrategies;
 
 /// 校验策略/表达式（xpath/class chain/predicate 语法错误返回 NO 并给出原因）
-+ (BOOL)validateUsing:(NSString *)strategy value:(NSString *)value error:(NSString **)error;
++ (BOOL)validateUsing:(NSString *)strategy value:(NSString *)value error:(NSString * _Nullable * _Nullable)error;
 
 /// 按策略返回全部匹配 view（视觉上层优先）；策略非法或表达式错误返回空数组
 + (NSArray<UIView *> *)findViewsUsing:(NSString *)strategy value:(NSString *)value;

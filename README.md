@@ -18,7 +18,7 @@ iOS 自动化操作项目的 iOS 端：一个纯 Objective-C App，作为常驻 
 
 ```
 Appium 客户端 ⇄ HTTP(W3C) ⇄ appium_bridge.js        W3C WebDriver 会话/元素/源码/手势/设备端点
-                             ⇅ WebSocket(JSON) ⇄ IUAWebSocketClient   通信层：连接/心跳/指数退避重连(1s→30s)
+                             ⇅ WebSocket(JSON) ⇄ IUAWebSocketClient   通信层：连接/心跳/指数退避重连(1s→10s)
                                                   ⇅ IUACommandDispatcher 调度层：主线程串行 FIFO + 单条超时
                                                   ⇅ IUAEngine            总控：消息路由/动作注册/日志上报
      ┌──────────────┬──────────────┬──────────────────┬──────────────────┐
@@ -161,14 +161,19 @@ await (await driver.$('~btn.counter')).click();
 console.log(await (await driver.$('~label.counter')).getText());   // Count: 1
 ```
 
-- **支持**：session、`findElement(s)`、click/sendKeys/clear、text/attribute/rect/displayed/enabled/selected、
-  element/window screenshot、page source XML、W3C Actions（tap/双击/长按/滑动/捏合/键盘）、
-  implicit wait、orientation、clipboard、keyboard、alert、shake、performance_data、`mobile:` 命令。
+- **支持**：session、`findElement(s)`、链式子元素、`element/active`、click/sendKeys/clear、
+  text/attribute/rect/displayed/enabled/selected、element/window screenshot、page source XML、
+  W3C Actions（tap/双击/长按/滑动/捏合/键盘）、implicit wait、orientation、clipboard、keyboard、
+  alert、shake、performance_data、app_state/app_installed、`mobile:` 命令。
 - **定位策略**：`accessibility id`、`name`、`label`、`text`、`class name`、`xpath`、
   `-ios predicate string`、`-ios class chain`（另兼容 `tag name` / `link text`）。
-- **边界**：同一时间单会话；仅宿主 App 进程内；`terminateApp/backgroundApp/lock` 等进程级控制不支持。
+- **边界**：同一时间单会话；仅宿主 App 进程内；`terminateApp/backgroundApp/lock`、App 安装/文件传输、
+  屏幕录制等进程级控制不支持（详见桥接文档）。
 
 完整端点表、客户端示例、能力与边界见 **[APPIUM_BRIDGE.md](APPIUM_BRIDGE.md)**。
+
+> 安全默认值：GUI HTTP 与 Appium 桥默认只监听 `127.0.0.1`；局域网访问 GUI 需 `GUI_HOST=0.0.0.0`，
+> 远程 Appium 客户端需 `BRIDGE_HOST=0.0.0.0`。App 的 WebSocket（9800）仍监听所有网卡以支持真机。
 
 ### 元素级定位速查（GUI / DSL / 桥共用）
 
@@ -318,7 +323,7 @@ tap/长按/滑动按位移(≥14pt)与时长(≥0.45s)自动判定；输入通�
 ### 上行（App → 服务器）
 
 ```json
-{"type":"hello","agent":"IUIAuto","version":"1.0.0","environment":{…},"actions":[…]}   // 连接建立
+{"type":"hello","agent":"IUIAuto","version":"0.3.0","environment":{…},"actions":[…]}   // 连接建立
 {"type":"result","id":"cmd-42","ok":true,"data":{…},"error":null,"elapsed":0.064}      // 指令结果
 {"type":"pong","timestamp":1760000000000}                                              // 应答 {"type":"ping"}
 {"type":"log","level":1,"message":"…"}                                                 // 日志转发(Info 以上)
@@ -356,8 +361,8 @@ tap/长按/滑动按位移(≥14pt)与时长(≥0.45s)自动判定；输入通�
     ├── iua_dsl.js               # DSL 解析器 + 录制步骤→DSL 转换
     ├── iua_runner.js            # 脚本执行器共享模块(GUI/CLI 复用)
     ├── run_script.js            # 脚本执行器/录制器(断言+报告+exit code)
-    ├── appium_bridge_test.mjs   # Appium 桥单测（假 App，30 项）
-    ├── appium_e2e_test.mjs      # Appium 桥 + 模拟器真实 E2E（27 项）
+    ├── appium_bridge_test.mjs   # Appium 桥单测（假 App，32 项）
+    ├── appium_e2e_test.mjs      # Appium 桥 + 模拟器真实 E2E（33 项）
     ├── record_test.mjs          # 录制功能端到端自检
     └── scripts/                 # GUI/CLI 共享的脚本库
 ```
@@ -374,9 +379,9 @@ tap/长按/滑动按位移(≥14pt)与时长(≥0.45s)自动判定；输入通�
 - Xcode 26.6 / iOS 26.5 模拟器（iPhone 17 Pro）
 - 指令链路端到端断言 12/12 通过：identifier 点击、坐标点击、计数联动、中文输入、提交联动、滑动滚动、截图、view 树导出
 - 录制回放闭环 6/6 通过：合成操作录制（tap×2/type_text/swipe 步骤数与内容精确校验）→ DSL 生成 → 回放 + 动态计数断言（验证录制与回放双向生效）
-- Appium 桥单测 30/30 通过（假 App：session/element/source/screenshot/W3C Actions/隐式等待/设备端点/mobile 命令）
-- Appium 桥 + 模拟器 E2E 27/27 通过（真实 UIKit 点击、输入、提交联动、弹窗、截图、W3C Actions、剪贴板/方向/键盘）
-- **WebdriverIO 10.2.0 真实客户端验证通过**：`remote` 建会话、`~` 定位、click、setValue、getPageSource、takeScreenshot、performActions、getAlertText/sendAlertText/acceptAlert、deleteSession
+- Appium 桥单测 32/32 通过（假 App：session/element/source/screenshot/W3C Actions/隐式等待/设备端点/mobile 命令）
+- Appium 桥 + 模拟器 E2E 33/33 通过（真实 UIKit 点击、输入、提交联动、弹窗、截图、W3C Actions、剪贴板/方向/键盘）
+- **WebdriverIO 10.2.0 真实客户端验证通过**（10/10）：`remote` 建会话、`~` 定位、链式子元素、queryAppState/isAppInstalled、getActiveElement、click、setValue、getPageSource、takeScreenshot、performActions、getAlertText/sendAlertText/acceptAlert、deleteSession
 
 ## Licenses
 

@@ -144,6 +144,8 @@ SOFTWARE.
     info[@"alpha"] = @(view.alpha);
     info[@"hidden"] = @(view.hidden);
     info[@"enabled"] = @(view.userInteractionEnabled);
+    info[@"window"] = view.window ? NSStringFromClass(view.window.class) : @"(nil)";
+    info[@"windowHidden"] = @(view.window.hidden);
 
     // 常见控件的值
     if ([view isKindOfClass:[UILabel class]]) {
@@ -181,13 +183,19 @@ SOFTWARE.
     NSDictionary *info = NSBundle.mainBundle.infoDictionary ?: @{};
 
     NSString *orientation = @"PORTRAIT";
-    for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
-        if (![scene isKindOfClass:[UIWindowScene class]]) continue;
-        UIInterfaceOrientation value = ((UIWindowScene *)scene).interfaceOrientation;
-        if (value == UIInterfaceOrientationLandscapeLeft || value == UIInterfaceOrientationLandscapeRight) {
-            orientation = @"LANDSCAPE";
+    UIInterfaceOrientation orientationValue = UIInterfaceOrientationUnknown;
+    if (window.windowScene) {
+        orientationValue = window.windowScene.interfaceOrientation;
+    } else {
+        for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
+            if (![scene isKindOfClass:[UIWindowScene class]]) continue;
+            orientationValue = ((UIWindowScene *)scene).interfaceOrientation;
+            break;
         }
-        break;
+    }
+    if (orientationValue == UIInterfaceOrientationLandscapeLeft ||
+        orientationValue == UIInterfaceOrientationLandscapeRight) {
+        orientation = @"LANDSCAPE";
     }
 
     return @{

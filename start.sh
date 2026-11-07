@@ -28,13 +28,14 @@ fi
 
 # 2) 模拟器（没有则自动处理；确实没有 Xcode/模拟器时给出指引后继续，仅启动控制台）
 step "检查模拟器"
-BOOTED=$(xcrun simctl list devices booted 2>/dev/null | grep -oE '\([0-9A-F-]{36}\)' | head -1 | tr -d '()' || true)
+BUNDLE_ID="${IUA_BUNDLE_ID:-com.iuiauto.example}"
+BOOTED=$(xcrun simctl list devices booted 2>/dev/null | sed -n '/-- iOS/,/^-- /p' | grep -oE '\([0-9A-F-]{36}\)' | head -1 | tr -d '()' || true)
 if [ -z "$BOOTED" ]; then
   echo "  没有已启动的模拟器，尝试启动…"
   if ! ./build.sh --boot-only; then
     echo "  ⚠ 无法启动模拟器（未装 Xcode?）。App 相关功能不可用，控制台仍会启动。"
   else
-    BOOTED=$(xcrun simctl list devices booted 2>/dev/null | grep -oE '\([0-9A-F-]{36}\)' | head -1 | tr -d '()' || true)
+    BOOTED=$(xcrun simctl list devices booted 2>/dev/null | sed -n '/-- iOS/,/^-- /p' | grep -oE '\([0-9A-F-]{36}\)' | head -1 | tr -d '()' || true)
   fi
 else
   echo "  模拟器已就绪: $BOOTED"
@@ -45,7 +46,7 @@ step "检查 App"
 if [ -z "$BOOTED" ]; then
   echo "  无运行中的模拟器，跳过 App 检查"
 else
-  INSTALLED=$(xcrun simctl get_app_container "$BOOTED" com.iuiauto.example 2>/dev/null || true)
+  INSTALLED=$(xcrun simctl get_app_container "$BOOTED" "$BUNDLE_ID" 2>/dev/null || true)
   if [ -z "$INSTALLED" ]; then
     echo "  App 未安装，开始构建安装（首次约 1-2 分钟）…"
     ./build.sh "$BOOTED"
@@ -54,7 +55,7 @@ else
     RUNNING=$(xcrun simctl spawn "$BOOTED" launchctl list 2>/dev/null | grep -c iuiauto || true)
     if [ "${RUNNING:-0}" -eq 0 ] 2>/dev/null; then
       echo "  App 未运行，启动中…"
-      xcrun simctl launch "$BOOTED" com.iuiauto.example >/dev/null
+      xcrun simctl launch "$BOOTED" "$BUNDLE_ID" >/dev/null
     else
       echo "  App 运行中（若模拟器窗口长时间失焦 App 可能被冻结，点一下窗口唤醒）"
     fi

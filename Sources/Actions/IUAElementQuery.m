@@ -26,6 +26,7 @@ SOFTWARE.
 #import "IUAViewIntrospector.h"
 #import "IUALogger.h"
 #import <math.h>
+#import <ctype.h>
 
 NSString *const IUAElementQueryErrorDomain = @"IUAElementQueryErrorDomain";
 NSString *const IUAElementStrategyAccessibilityId = @"accessibility id";
@@ -49,6 +50,21 @@ static BOOL IUAIsNumericString(NSString *text) {
     for (NSUInteger i = 0; i < text.length; i++) {
         if (![digits characterIsMember:[text characterAtIndex:i]]) return NO;
     }
+    return YES;
+}
+
+static BOOL IUAParseNumberString(NSString *text, double *outValue) {
+    NSString *trimmed = IUATrim(text);
+    if (trimmed.length == 0) return NO;
+    const char *cstr = trimmed.UTF8String;
+    if (!cstr) return NO;
+    char *end = NULL;
+    double value = strtod(cstr, &end);
+    if (end == cstr || end == NULL) return NO;
+    while (*end != '\0' && isspace((unsigned char)*end)) end++;
+    if (*end != '\0') return NO;
+    if (!isfinite(value)) return NO;
+    if (outValue) *outValue = value;
     return YES;
 }
 
@@ -127,8 +143,16 @@ static CGRect IUAFrameInWindow(UIView *view) {
 }
 
 static BOOL IUAVisibleInWindow(UIView *view) {
-    if ([view isKindOfClass:[UIWindow class]]) return !view.hidden && view.alpha > 0.01;
-    if (view.hidden || view.alpha < 0.01 || view.window == nil) return NO;
+    if (!view) return NO;
+    // 祖先链上任意一层 hidden/透明都会让子视图不可见（XCUITest visible 语义）
+    UIView *node = view;
+    while (node) {
+        if (node.hidden || node.alpha < 0.01) return NO;
+        if ([node isKindOfClass:[UIWindow class]]) break;
+        node = node.superview;
+    }
+    if ([view isKindOfClass:[UIWindow class]]) return YES;
+    if (view.window == nil) return NO;
     CGRect frame = IUAFrameInWindow(view);
     if (frame.size.width <= 0 || frame.size.height <= 0) return NO;
     return CGRectIntersectsRect(frame, view.window.bounds);
@@ -463,16 +487,24 @@ static BOOL IUACompareAttribute(UIView *view, NSString *attribute, NSString *op,
             ([lhs isEqualToString:@"0"] && [rhs.lowercaseString isEqualToString:@"false"])) return YES;
         if (([rhs isEqualToString:@"1"] && [lhs.lowercaseString isEqualToString:@"true"]) ||
             ([rhs isEqualToString:@"0"] && [lhs.lowercaseString isEqualToString:@"false"])) return YES;
-        return [lhs doubleValue] == [rhs doubleValue] && lhs.length > 0 && rhs.length > 0 && IUAIsNumericString(lhs) && IUAIsNumericString(rhs);
+        double lhsNumber = 0, rhsNumber = 0;
+        if (IUAParseNumberString(lhs, &lhsNumber) && IUAParseNumberString(rhs, &rhsNumber)) {
+            return lhsNumber == rhsNumber;
+        }
+        return NO;
     }
     if ([op isEqualToString:@"!="]) return !IUACompareAttribute(view, attribute, @"=", expected);
     if ([op isEqualToString:@"contains"]) return [lhs containsString:rhs];
     if ([op isEqualToString:@"starts-with"]) return [lhs hasPrefix:rhs];
     if ([op isEqualToString:@"ends-with"]) return [lhs hasSuffix:rhs];
-    if ([op isEqualToString:@">"]) return [lhs doubleValue] > [rhs doubleValue];
-    if ([op isEqualToString:@"<"]) return [lhs doubleValue] < [rhs doubleValue];
-    if ([op isEqualToString:@">="]) return [lhs doubleValue] >= [rhs doubleValue];
-    if ([op isEqualToString:@"<="]) return [lhs doubleValue] <= [rhs doubleValue];
+    double lhsNumber = 0, rhsNumber = 0;
+    if (!IUAParseNumberString(lhs, &lhsNumber) || !IUAParseNumberString(rhs, &rhsNumber)) {
+        return NO; // XPath 数值比较对非数字操作数返回 false，避免 doubleValue(0) 误匹配
+    }
+    if ([op isEqualToString:@">"]) return lhsNumber > rhsNumber;
+    if ([op isEqualToString:@"<"]) return lhsNumber < rhsNumber;
+    if ([op isEqualToString:@">="]) return lhsNumber >= rhsNumber;
+    if ([op isEqualToString:@"<="]) return lhsNumber <= rhsNumber;
     return NO;
 }
 
@@ -706,21 +738,26 @@ static NSArray<UIView *> *IUAEvaluateXPath(NSString *path) {
 
 #pragma mark - iOS Predicate String
 
-static BOOL IUAEvaluateNSPredicate(UIView *view, NSString *format) {
+static NSPredicate * _Nullable IUACompilePredicate(NSString *format) {
     @try {
-        NSPredicate *predicate = [NSPredicate predicateWithFormat:format];
-        NSDictionary<NSString *, id> *attrs = IUAAttributesForView(view);
-        return [predicate evaluateWithObject:attrs];
+        return [NSPredicate predicateWithFormat:format];
     } @catch (NSException *exception) {
-        IUALogWarn(@"谓词求值失败: %@ (%@)", format, exception.reason);
-        return NO;
+        IUALogWarn(@"谓词编译失败: %@ (%@)", format, exception.reason);
+        return nil;
     }
 }
 
-static NSArray<UIView *> *IUAFilterByPredicate(NSArray<UIView *> *views, NSString *predicate) {
+static NSArray<UIView *> *IUAFilterByPredicate(NSArray<UIView *> *views, NSString *predicateFormat) {
+    NSPredicate *predicate = nil;
+    @try {
+        predicate = [NSPredicate predicateWithFormat:predicateFormat];
+    } @catch (NSException *exception) {
+        IUALogWarn(@"谓词编译失败: %@ (%@)", predicateFormat, exception.reason);
+        return @[];
+    }
     NSMutableArray<UIView *> *matched = [NSMutableArray array];
     for (UIView *view in views) {
-        if (IUAEvaluateNSPredicate(view, predicate)) [matched addObject:view];
+        if ([predicate evaluateWithObject:IUAAttributesForView(view)]) [matched addObject:view];
     }
     return matched;
 }
@@ -785,8 +822,11 @@ static NSArray<IUAChainStep *> *IUAParseClassChain(NSString *chain, BOOL *ok) {
             if (IUAIsNumericString(content)) {
                 index = content.integerValue;
             } else if (content.length >= 2 && [content hasPrefix:@"`"] && [content hasSuffix:@"`"]) {
-                [predicates addObject:[content substringWithRange:NSMakeRange(1, content.length - 2)]];
+                NSString *predicate = [content substringWithRange:NSMakeRange(1, content.length - 2)];
+                if (!IUACompilePredicate(predicate)) return nil;
+                [predicates addObject:predicate];
             } else {
+                if (!IUACompilePredicate(content)) return nil;
                 [predicates addObject:content];
             }
         }
@@ -798,6 +838,13 @@ static NSArray<IUAChainStep *> *IUAParseClassChain(NSString *chain, BOOL *ok) {
         step.index = index;
         [steps addObject:step];
         nextDescendant = NO;
+    }
+    // XCUITest class chain 有时以 Application/AppiumAUT 虚拟根开头；我们没有对应 view，
+    // 去掉后从 Window 开始查询（与 XPath 行为保持一致）。
+    while (steps.count > 0 &&
+           ([steps.firstObject.type isEqualToString:@"XCUIElementTypeApplication"] ||
+            [steps.firstObject.type isEqualToString:@"AppiumAUT"])) {
+        [steps removeObjectAtIndex:0];
     }
     if (steps.count == 0) return nil;
     steps.firstObject.descendant = YES;
@@ -824,23 +871,41 @@ static NSArray<UIView *> *IUAEvaluateClassChain(NSString *chain) {
                 }
             }
         }
+        NSMutableArray<NSPredicate *> *predicates = [NSMutableArray array];
+        BOOL invalidPredicate = NO;
+        for (NSString *format in step.predicates) {
+            NSPredicate *predicate = IUACompilePredicate(format);
+            if (predicate) [predicates addObject:predicate];
+            else invalidPredicate = YES;
+        }
+        if (invalidPredicate) {
+            current = @[];
+            break;
+        }
         NSMutableArray<UIView *> *matched = [NSMutableArray array];
         for (UIView *candidate in candidates) {
             if (!IUAClassMatches(candidate, step.type)) continue;
+            NSDictionary<NSString *, id> *attrs = predicates.count > 0 ? IUAAttributesForView(candidate) : nil;
             BOOL pass = YES;
-            for (NSString *predicate in step.predicates) {
-                if (!IUAEvaluateNSPredicate(candidate, predicate)) { pass = NO; break; }
+            for (NSPredicate *predicate in predicates) {
+                if (![predicate evaluateWithObject:attrs]) { pass = NO; break; }
             }
             if (pass) [matched addObject:candidate];
         }
+        // 多层 ** 时同一 view 可能被多个父上下文加入，去重后再应用 index
+        NSMutableArray<UIView *> *unique = [NSMutableArray array];
+        NSHashTable *seen = [NSHashTable hashTableWithOptions:NSPointerFunctionsObjectPointerPersonality];
+        for (UIView *view in matched) {
+            if (![seen containsObject:view]) { [seen addObject:view]; [unique addObject:view]; }
+        }
         if (step.index > 0) {
-            if ((NSUInteger)step.index <= matched.count) {
-                current = @[matched[step.index - 1]];
+            if ((NSUInteger)step.index <= unique.count) {
+                current = @[unique[step.index - 1]];
             } else {
                 current = @[];
             }
         } else {
-            current = matched;
+            current = unique;
         }
         if (current.count == 0) break;
     }
@@ -917,7 +982,7 @@ static UIResponder *gIUAActiveElementResponder = nil;
              @"class chain"];
 }
 
-+ (BOOL)validateUsing:(NSString *)strategy value:(NSString *)value error:(NSString **)error {
++ (BOOL)validateUsing:(NSString *)strategy value:(NSString *)value error:(NSString * _Nullable * _Nullable)error {
     NSString *key = IUATrim(strategy ?: @"").lowercaseString;
     if ([key isEqualToString:@"xpath"]) {
         if (value.length == 0) {

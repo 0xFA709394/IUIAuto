@@ -147,7 +147,14 @@ function send(action, params = {}, timeoutSec = 15) {
     }, timeoutSec * 1000);
     pending.set(id, { resolve, timer });
     const payload = JSON.stringify({ id, action, params, timeout: timeoutSec });
-    socket.send(payload);
+    try {
+      socket.send(payload);
+    } catch (e) {
+      clearTimeout(timer);
+      pending.delete(id);
+      resolve({ ok: false, error: `发送失败: ${e.message}` });
+      return;
+    }
     console.log(`\n[send] ${payload.slice(0, 160)}`);
   });
 }

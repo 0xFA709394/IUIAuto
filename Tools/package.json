@@ -10,6 +10,7 @@
   "scripts": {
     "bridge": "node appium_bridge.js",
     "test:bridge": "node appium_bridge_test.mjs",
-    "test:e2e": "node appium_e2e_test.mjs"
+    "test:e2e": "node appium_e2e_test.mjs",
+    "test:dsl": "node dsl_regression_test.mjs"
   }
 }

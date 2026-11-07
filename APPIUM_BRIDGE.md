@@ -8,7 +8,7 @@
 >
 > 已用 **WebdriverIO 10.2.0** 真实客户端验证：建会话 / `~` 定位 / click / setValue /
 > getPageSource / takeScreenshot / performActions / getAlertText / sendAlertText / acceptAlert /
-> deleteSession 全部通过。
+> queryAppState / isAppInstalled / getActiveElement / 链式子元素 / deleteSession 全部通过。
 
 ---
 
@@ -157,6 +157,9 @@ curl -s -X POST http://127.0.0.1:4723/session/<SID>/element \
 | GET | `/session/:id` | 当前 capabilities |
 | POST | `/session/:id/element` | 查找单个元素 |
 | POST | `/session/:id/elements` | 查找多个元素 |
+| GET | `/session/:id/element/active` | 当前焦点元素 |
+| POST | `/session/:id/element/:eid/element` | 在父元素下查找子元素 |
+| POST | `/session/:id/element/:eid/elements` | 在父元素下查找多个子元素 |
 | POST | `/session/:id/element/:eid/click` | 点击 |
 | POST | `/session/:id/element/:eid/value` | 输入文本 |
 | POST | `/session/:id/element/:eid/clear` | 清空 |
@@ -201,7 +204,9 @@ curl -s -X POST http://127.0.0.1:4723/session/<SID>/element \
 | GET/POST | `/session/:id/appium/device/get_clipboard` | 读剪贴板 |
 | POST | `/session/:id/appium/device/delete_clipboard` | 清空剪贴板 |
 | POST | `/session/:id/appium/device/activate_app` | 当前 App（no-op） |
-| POST | `/session/:id/appium/device/query_app_state` | App 状态（1/3/4） |
+| POST | `/session/:id/appium/device/app_state` | App 状态（1/3/4，WebdriverIO 标准路径） |
+| POST | `/session/:id/appium/device/query_app_state` | 同上（别名） |
+| POST | `/session/:id/appium/device/app_installed` | 当前 App 是否安装 |
 | POST | `/session/:id/alert/accept|dismiss` | W3C 标准弹窗接受/关闭 |
 | GET/POST | `/session/:id/alert/text` | W3C 标准弹窗文本/设置文本 |
 | POST | `/session/:id/appium/alert/accept|dismiss` | Appium 别名（同上） |
@@ -249,7 +254,11 @@ curl -s -X POST http://127.0.0.1:4723/session/<SID>/element \
 
 **明确不支持**（进程内 Agent 的边界）：
 `terminateApp`、`backgroundApp`、`lock`/`unlock`/`isLocked`、`pressKeyCode`（Android）、
-`startActivity`（Android）。这些需要宿主/模拟器侧的进程控制，可用 `xcrun simctl` 在测试脚本中完成。
+`startActivity`（Android）、`installApp`/`removeApp`、`pushFile`/`pullFile`、
+`startRecordingScreen`/`stopRecordingScreen`。这些需要宿主/模拟器侧的进程/文件控制，可用 `xcrun simctl` 在测试脚本中完成。
+
+> `mobile: tap`/`doubleTap`/`touchAndHold` 在同时提供 `element` 时，`x`/`y` 按“相对元素左上角”处理；
+> `mobile: dragFromToForDuration` 的四个坐标同样按元素相对坐标平移。
 
 ---
 
@@ -263,3 +272,6 @@ curl -s -X POST http://127.0.0.1:4723/session/<SID>/element \
 - **端口冲突**：GUI 与独立桥不能同时占用 9800；`--takeover` 可接管旧实例。
 - **App 未连接**：`POST /session` 返回 500 `session not created`；检查 App 是否启动、地址是否 9800。
 - **元素失效**：页面变化后旧句柄会返回 `stale element reference`，重新 find 即可。
+- **XPath/class chain 索引**：`[n]` 当前按全局匹配结果取第 n 个，不是严格的“每个父节点下第 n 个”；复杂层级建议使用唯一 identifier/name 或完整路径。
+- **WebDriver 监听地址**：默认只绑定 `127.0.0.1`（`BRIDGE_HOST` 可改）；GUI 默认 `GUI_HOST=127.0.0.1`。
+- **App WebSocket**：9800 仍监听所有网卡以支持真机；当前无鉴权，请只在可信网络使用。

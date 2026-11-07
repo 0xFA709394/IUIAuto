@@ -173,7 +173,13 @@ static BOOL IUASendMsgObject(id target, NSArray<NSString *> *names, id object) {
 
 + (BOOL)isSupported {
     UITouch *probe = [[UITouch alloc] init];
-    return IUASendMsgEnum(probe, @[@"_setPhase:", @"setPhase:"], UITouchPhaseBegan);
+    BOOL hasPhase = [probe respondsToSelector:NSSelectorFromString(@"_setPhase:")] ||
+                    [probe respondsToSelector:NSSelectorFromString(@"setPhase:")];
+    BOOL hasLocation = [probe respondsToSelector:NSSelectorFromString(@"_setLocationInWindow:resetPrevious:")] ||
+                       [probe respondsToSelector:NSSelectorFromString(@"setLocationInWindow:")];
+    BOOL hasView = [probe respondsToSelector:NSSelectorFromString(@"_setView:")] ||
+                   [probe respondsToSelector:NSSelectorFromString(@"setView:")];
+    return hasPhase && hasLocation && hasView;
 }
 
 #pragma mark - 对外动作
@@ -376,11 +382,19 @@ static BOOL IUASendMsgObject(id target, NSArray<NSString *> *names, id object) {
 }
 
 - (void)setLocation:(UITouch *)touch location:(CGPoint)location resetPrevious:(BOOL)reset {
-    BOOL ok = IUASendMsgCGPointBool(touch, @[@"_setLocationInWindow:resetPrevious:",
-                                             @"setLocationInWindow:"], location, reset);
-    if (!ok) {
-        IUALogError(@"无法设置 touch location（私有 setter 不可用）");
+    if (IUASendMsgCGPointBool(touch, @[@"_setLocationInWindow:resetPrevious:"], location, reset)) {
+        return;
     }
+    // 兼容回退 setter 只有一个 CGPoint 参数，不能按 CGPoint+BOOL 调用
+    for (NSString *name in @[@"setLocationInWindow:"]) {
+        SEL selector = NSSelectorFromString(name);
+        if ([touch respondsToSelector:selector]) {
+            void (*msgSend)(id, SEL, CGPoint) = (void (*)(id, SEL, CGPoint))objc_msgSend;
+            msgSend(touch, selector, location);
+            return;
+        }
+    }
+    IUALogError(@"无法设置 touch location（私有 setter 不可用）");
 }
 
 - (void)setPhase:(UITouch *)touch phase:(UITouchPhase)phase {

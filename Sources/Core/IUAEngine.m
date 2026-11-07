@@ -66,6 +66,8 @@ static UIResponder *IUACurrentFirstResponderForInput(void) {
 #pragma mark - 设备 / 系统信息辅助
 
 static UIWindowScene *IUAKeyWindowScene(void) {
+    UIWindow *window = [IUAViewIntrospector keyWindow];
+    if (window.windowScene) return window.windowScene;
     for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
         if ([scene isKindOfClass:[UIWindowScene class]]) {
             return (UIWindowScene *)scene;
@@ -133,7 +135,8 @@ static BOOL IUAKeyboardShown(void) {
         if (![scene isKindOfClass:[UIWindowScene class]]) continue;
         for (UIWindow *window in ((UIWindowScene *)scene).windows) {
             NSString *className = NSStringFromClass(window.class);
-            if ([className containsString:@"Keyboard"] || [className containsString:@"TextEffects"]) {
+            if (([className containsString:@"Keyboard"] || [className containsString:@"TextEffects"]) &&
+                !window.hidden && window.alpha > 0.01) {
                 return YES;
             }
         }
@@ -370,11 +373,13 @@ static BOOL IUAValidateLocator(NSString *using, NSString *value, NSString * __au
     displayName:(NSString *)displayName
        tapCount:(NSUInteger)tapCount
         attempt:(NSUInteger)attempt
+       resolver:(nullable UIView *(^)(void))resolver
      completion:(void (^)(BOOL, NSDictionary *, NSString *))finish;
 - (void)longPressView:(UIView *)view
           displayName:(NSString *)displayName
              duration:(NSTimeInterval)duration
               attempt:(NSUInteger)attempt
+             resolver:(nullable UIView *(^)(void))resolver
            completion:(void (^)(BOOL, NSDictionary *, NSString *))finish;
 - (void)waitForElementUsing:(NSString *)using
                       value:(NSString *)value
@@ -413,14 +418,22 @@ static BOOL IUAValidateLocator(NSString *using, NSString *value, NSString * __au
 }
 
 - (void)startWithServerURLString:(NSString *)urlString {
+    NSString *candidate = urlString.length > 0
+        ? [urlString stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]]
+        : [IUAConfiguration serverURLString];
+    if (![IUAConfiguration isValidServerURLString:candidate]) {
+        // 关键：校验失败时不要保存、也不要断开旧连接，避免一次输入错误让 Agent 彻底失联
+        IUALogError(@"服务器地址无效（需要 ws:// 或 wss:// 绝对地址）: %@", candidate ?: @"");
+        return;
+    }
     if (urlString.length > 0) {
-        [IUAConfiguration setServerURLString:urlString];
+        [IUAConfiguration setServerURLString:candidate];
     }
     [self stop];
 
     NSURL *url = [IUAConfiguration serverURL];
     if (!url) {
-        IUALogError(@"服务器地址无效: %@", [IUAConfiguration serverURLString]);
+        IUALogError(@"服务器地址无效: %@", candidate);
         return;
     }
     self.client = [[IUAWebSocketClient alloc] initWithURL:url];
@@ -725,7 +738,7 @@ static BOOL IUAValidateLocator(NSString *using, NSString *value, NSString * __au
             return;
         }
         NSArray<UIView *> *views = [IUAElementQuery findViewsUsing:using value:value];
-        NSInteger start = MAX(index, 0);
+        NSInteger start = index < 0 ? MAX((NSInteger)views.count + index, 0) : index;
         NSInteger limit = MAX([cmd integerParam:@"limit" default:100], 0);
         finish(YES, [IUAElementQuery elementsJSONForViews:views start:start limit:limit using:using value:value], nil);
     });
@@ -751,7 +764,7 @@ static BOOL IUAValidateLocator(NSString *using, NSString *value, NSString * __au
         NSMutableDictionary *info = [[IUAElementQuery attributesForView:view] mutableCopy];
         info[@"using"] = using;
         info[@"locatorValue"] = value;
-        info[@"index"] = @(index);
+        info[@"locatorIndex"] = @(index);
         finish(YES, info, nil);
     });
 
@@ -778,7 +791,10 @@ static BOOL IUAValidateLocator(NSString *using, NSString *value, NSString * __au
         NSDictionary<NSString *, id> *attrs = [IUAElementQuery attributesForView:view];
 
         if ([action isEqualToString:@"click"] || [action isEqualToString:@"tap"]) {
-            [self tapView:view displayName:displayName tapCount:1 attempt:0 completion:^(BOOL ok, NSDictionary *data, NSString *error) {
+            UIView *(^resolver)(void) = ^UIView *{
+                return [IUAElementQuery findViewUsing:using value:value index:index];
+            };
+            [self tapView:view displayName:displayName tapCount:1 attempt:0 resolver:resolver completion:^(BOOL ok, NSDictionary *data, NSString *error) {
                 NSMutableDictionary *out = [data mutableCopy] ?: [NSMutableDictionary dictionary];
                 out[@"element"] = attrs;
                 finish(ok, out, error);
@@ -787,7 +803,10 @@ static BOOL IUAValidateLocator(NSString *using, NSString *value, NSString * __au
         }
         if ([action isEqualToString:@"double_click"] || [action isEqualToString:@"double_tap"] ||
             [action isEqualToString:@"doubleclick"]) {
-            [self tapView:view displayName:displayName tapCount:2 attempt:0 completion:^(BOOL ok, NSDictionary *data, NSString *error) {
+            UIView *(^resolver)(void) = ^UIView *{
+                return [IUAElementQuery findViewUsing:using value:value index:index];
+            };
+            [self tapView:view displayName:displayName tapCount:2 attempt:0 resolver:resolver completion:^(BOOL ok, NSDictionary *data, NSString *error) {
                 NSMutableDictionary *out = [data mutableCopy] ?: [NSMutableDictionary dictionary];
                 out[@"element"] = attrs;
                 out[@"doubleTapped"] = @(ok);
@@ -798,7 +817,11 @@ static BOOL IUAValidateLocator(NSString *using, NSString *value, NSString * __au
         if ([action isEqualToString:@"long_click"] || [action isEqualToString:@"long_press"] ||
             [action isEqualToString:@"longclick"] || [action isEqualToString:@"touch_and_hold"]) {
             double duration = [cmd floatParam:@"duration" default:0.8];
-            [self longPressView:view displayName:displayName duration:duration attempt:0 completion:^(BOOL ok, NSDictionary *data, NSString *error) {
+            UIView *(^resolver)(void) = ^UIView *{
+                return [IUAElementQuery findViewUsing:using value:value index:index];
+            };
+            [self longPressView:view displayName:displayName duration:duration attempt:0
+                       resolver:resolver completion:^(BOOL ok, NSDictionary *data, NSString *error) {
                 NSMutableDictionary *out = [data mutableCopy] ?: [NSMutableDictionary dictionary];
                 out[@"element"] = attrs;
                 finish(ok, out, error);
@@ -1160,12 +1183,15 @@ static BOOL IUAValidateLocator(NSString *using, NSString *value, NSString * __au
                           @"requested" : IUAOrientationString()}, nil);
             return;
         }
+        NSString *before = IUAOrientationString();
         IUASetOrientationString(requested);
         // requestGeometryUpdate 是异步的，稍等一帧再读实际方向
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.35 * NSEC_PER_SEC)),
                        dispatch_get_main_queue(), ^{
-            finish(YES, @{@"orientation" : IUAOrientationString(),
-                          @"requested" : requested}, nil);
+            NSString *after = IUAOrientationString();
+            finish(YES, @{@"orientation" : after,
+                          @"requested" : requested,
+                          @"changed" : @(![after isEqualToString:before])}, nil);
         });
     });
 
@@ -1220,6 +1246,11 @@ static BOOL IUAValidateLocator(NSString *using, NSString *value, NSString * __au
             IUATextSynthesizer *synthesizer = [[IUATextSynthesizer alloc] init];
             [synthesizer clearTextInView:field completion:^(NSError * _Nullable error) {
                 if (error) { finish(NO, nil, error.localizedDescription); return; }
+                if (text.length == 0) {
+                    base[@"setText"] = @"";
+                    finish(YES, base, nil);
+                    return;
+                }
                 [synthesizer typeText:text intoView:field completion:^(NSError * _Nullable error2) {
                     if (error2) { finish(NO, nil, error2.localizedDescription); return; }
                     base[@"setText"] = text;
@@ -1258,7 +1289,7 @@ static BOOL IUAValidateLocator(NSString *using, NSString *value, NSString * __au
         }
         NSString *buttonTitle = target.title ?: @"";
         [self tapView:control displayName:[NSString stringWithFormat:@"alert[%@]", buttonTitle]
-             tapCount:1 attempt:0 completion:^(BOOL ok, NSDictionary *data, NSString *error) {
+             tapCount:1 attempt:0 resolver:nil completion:^(BOOL ok, NSDictionary *data, NSString *error) {
             if (!ok) { finish(NO, nil, error); return; }
             base[@"clickedButton"] = buttonTitle;
             // 等 alert 关闭动画/action handler 执行完，避免脚本紧接着断言时读到旧值
@@ -1277,8 +1308,11 @@ static BOOL IUAValidateLocator(NSString *using, NSString *value, NSString * __au
             return;
         }
         [UIApplication.sharedApplication openURL:url options:@{} completionHandler:^(BOOL success) {
-            finish(success, @{@"url" : url.absoluteString ?: @""},
-                   success ? nil : @"openURL 被系统拒绝");
+            // 调度器要求完成回调在主线程；openURL 的 completion 队列没有强保证
+            dispatch_async(dispatch_get_main_queue(), ^{
+                finish(success, @{@"url" : url.absoluteString ?: @""},
+                       success ? nil : @"openURL 被系统拒绝");
+            });
         }];
     });
 
@@ -1327,7 +1361,13 @@ static BOOL IUAValidateLocator(NSString *using, NSString *value, NSString * __au
         finish(NO, nil, [NSString stringWithFormat:@"找不到可见的 view: identifier=%@", identifier]);
         return;
     }
-    [self tapView:view displayName:identifier tapCount:tapCount attempt:attempt completion:finish];
+    __weak typeof(self) weakSelf = self;
+    UIView *(^resolver)(void) = ^UIView *{
+        __strong typeof(weakSelf) strongSelf = weakSelf;
+        return strongSelf ? [IUAViewIntrospector findViewWithIdentifier:identifier] : nil;
+    };
+    [self tapView:view displayName:identifier tapCount:tapCount attempt:attempt
+         resolver:resolver completion:finish];
 }
 
 /// 通用元素点击：元素级定位（xpath/class chain/predicate…）与 identifier 共用。
@@ -1336,13 +1376,22 @@ static BOOL IUAValidateLocator(NSString *using, NSString *value, NSString * __au
     displayName:(NSString *)displayName
        tapCount:(NSUInteger)tapCount
         attempt:(NSUInteger)attempt
+       resolver:(nullable UIView *(^)(void))resolver
      completion:(void (^)(BOOL, NSDictionary *, NSString *))finish {
     if (attempt == 0) {
         // 悬浮条避让：防止它遮挡点击目标（顶部区域元素）
         [[IUAFloatingStatusBar sharedBar] yieldForInteraction];
     }
+    if (view && [view.accessibilityIdentifier isEqualToString:@"bar.floating"] && view.alpha < 0.01) {
+        // 悬浮条可能刚被上一条指令 yieldForInteraction 淡出；自动化再次点击它时强制恢复
+        [[IUAFloatingStatusBar sharedBar] revealForAutomation];
+    }
     if (!view || !view.window || view.hidden || view.alpha < 0.01) {
-        finish(NO, nil, [NSString stringWithFormat:@"找不到可见的 view: %@", displayName]);
+        NSString *reason = !view ? @"view=nil"
+            : !view.window ? @"window=nil"
+            : view.hidden ? @"hidden"
+            : [NSString stringWithFormat:@"alpha=%.2f", view.alpha];
+        finish(NO, nil, [NSString stringWithFormat:@"找不到可见的 view: %@ (%@)", displayName, reason]);
         return;
     }
     [self ensureViewVisible:view];
@@ -1362,7 +1411,13 @@ static BOOL IUAValidateLocator(NSString *using, NSString *value, NSString * __au
         if (attempt + 1 < 10) {
             dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.4 * NSEC_PER_SEC)),
                            dispatch_get_main_queue(), ^{
-                [self tapView:view displayName:displayName tapCount:tapCount attempt:attempt + 1 completion:finish];
+                UIView *nextView = resolver ? resolver() : view;
+                if (!nextView) {
+                    finish(NO, nil, [NSString stringWithFormat:@"重试时找不到元素: %@", displayName]);
+                    return;
+                }
+                [self tapView:nextView displayName:displayName tapCount:tapCount attempt:attempt + 1
+                     resolver:resolver completion:finish];
             });
             return;
         }
@@ -1380,7 +1435,13 @@ static BOOL IUAValidateLocator(NSString *using, NSString *value, NSString * __au
         if (attempt + 1 < 10) {
             dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.6 * NSEC_PER_SEC)),
                            dispatch_get_main_queue(), ^{
-                [self tapView:view displayName:displayName tapCount:tapCount attempt:attempt + 1 completion:finish];
+                UIView *nextView = resolver ? resolver() : view;
+                if (!nextView) {
+                    finish(NO, nil, [NSString stringWithFormat:@"重试时找不到元素: %@", displayName]);
+                    return;
+                }
+                [self tapView:nextView displayName:displayName tapCount:tapCount attempt:attempt + 1
+                     resolver:resolver completion:finish];
             });
             return;
         }
@@ -1393,12 +1454,21 @@ static BOOL IUAValidateLocator(NSString *using, NSString *value, NSString * __au
           displayName:(NSString *)displayName
              duration:(NSTimeInterval)duration
               attempt:(NSUInteger)attempt
+             resolver:(nullable UIView *(^)(void))resolver
            completion:(void (^)(BOOL, NSDictionary *, NSString *))finish {
     if (attempt == 0) {
         [[IUAFloatingStatusBar sharedBar] yieldForInteraction];
     }
+    if (view && [view.accessibilityIdentifier isEqualToString:@"bar.floating"] && view.alpha < 0.01) {
+        // 悬浮条可能刚被上一条指令 yieldForInteraction 淡出；自动化再次点击它时强制恢复
+        [[IUAFloatingStatusBar sharedBar] revealForAutomation];
+    }
     if (!view || !view.window || view.hidden || view.alpha < 0.01) {
-        finish(NO, nil, [NSString stringWithFormat:@"找不到可见的 view: %@", displayName]);
+        NSString *reason = !view ? @"view=nil"
+            : !view.window ? @"window=nil"
+            : view.hidden ? @"hidden"
+            : [NSString stringWithFormat:@"alpha=%.2f", view.alpha];
+        finish(NO, nil, [NSString stringWithFormat:@"找不到可见的 view: %@ (%@)", displayName, reason]);
         return;
     }
     [self ensureViewVisible:view];
@@ -1414,7 +1484,13 @@ static BOOL IUAValidateLocator(NSString *using, NSString *value, NSString * __au
         if (attempt + 1 < 5) {
             dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.4 * NSEC_PER_SEC)),
                            dispatch_get_main_queue(), ^{
-                [self longPressView:view displayName:displayName duration:duration attempt:attempt + 1 completion:finish];
+                UIView *nextView = resolver ? resolver() : view;
+                if (!nextView) {
+                    finish(NO, nil, [NSString stringWithFormat:@"重试时找不到元素: %@", displayName]);
+                    return;
+                }
+                [self longPressView:nextView displayName:displayName duration:duration
+                           attempt:attempt + 1 resolver:resolver completion:finish];
             });
             return;
         }

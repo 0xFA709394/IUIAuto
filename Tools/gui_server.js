@@ -23,7 +23,7 @@ import { WebSocketServer } from 'ws';
 import { parseScript, stepsToDSL, DSL_HELP } from './iua_dsl.js';
 import { runSteps } from './iua_runner.js';
 import { startXctraceRecording } from './iua_perf.js';
-import { ensurePortFree, handleListenError } from './iua_ports.js';
+import { ensurePortFree, handleListenError, APP_BUNDLE_ID } from './iua_ports.js';
 import { createAppiumBridge } from './appium_bridge.js';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -33,7 +33,8 @@ async function detectBootedSimulator() {
   const { stdout } = await execFileAsync('xcrun', ['simctl', 'list', 'devices', 'booted'], {
     env: { ...process.env, DEVELOPER_DIR: process.env.DEVELOPER_DIR || '/Applications/Xcode.app/Contents/Developer' },
   }).catch(() => ({ stdout: '' }));
-  const m = stdout.match(/\(([0-9A-F-]{36})\)/);
+  const iosLine = stdout.split('\n').find((line) => /iPhone|iPad/.test(line) && /\([0-9A-F-]{36}\)/.test(line));
+  const m = iosLine ? iosLine.match(/\(([0-9A-F-]{36})\)/) : null;
   return m ? m[1] : null;
 }
 
@@ -41,6 +42,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const HTTP_PORT = +(process.env.PORT || 9900);
 const APP_PORT = +(process.env.APP_PORT || 9800);
 const BRIDGE_PORT = +(process.env.BRIDGE_PORT || 4723);
+const GUI_HOST = process.env.GUI_HOST || '127.0.0.1';
+const BRIDGE_HOST = process.env.BRIDGE_HOST || '127.0.0.1';
 const DEVELOPER_DIR = process.env.DEVELOPER_DIR || '/Applications/Xcode.app/Contents/Developer';
 const SCRIPTS_DIR = join(__dirname, 'scripts');
 if (!existsSync(SCRIPTS_DIR)) mkdirSync(SCRIPTS_DIR, { recursive: true });
@@ -91,7 +94,14 @@ appWss.on('connection', (ws) => {
   // 新连接顶替旧连接（App 重启/双进程）：关闭旧的，避免向死连接发送
   if (appSocket && appSocket !== ws) { try { appSocket.close(); } catch {} }
   appSocket = ws;
-  ws.on('close', () => { if (appSocket === ws) { appSocket = null; broadcast({ type: 'app_state', connected: false, hello: null }); } });
+  ws.on('close', () => {
+    // 仅当前连接可以清空状态；App 重连时旧 socket 的 close 不能覆盖新连接
+    if (appSocket !== ws) return;
+    console.log('[gui] App 断开（等待重连…）');
+    appSocket = null;
+    appHello = null;
+    broadcast({ type: 'app_state', connected: false, hello: null });
+  });
   ws.on('message', (data) => {
     let msg; try { msg = JSON.parse(data.toString()); } catch { return; }
     if (msg.type === 'result') {
@@ -103,12 +113,6 @@ appWss.on('connection', (ws) => {
     } else if (msg.type === 'log') {
       broadcast({ type: 'app_log', level: msg.level, message: msg.message });
     }
-  });
-  ws.on('close', () => {
-    console.log('[gui] App 断开（等待重连…）');
-    appSocket = null;
-    appHello = null;
-    broadcast({ type: 'app_state', connected: false, hello: null });
   });
 });
 
@@ -132,7 +136,10 @@ function safeSend(ws, text) {
 const httpServer = createServer((req, res) => {
   if (req.url === '/' || req.url === '/index.html') {
     res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
-    res.end(readFileSync(join(__dirname, 'gui.html')));
+    const html = readFileSync(join(__dirname, 'gui.html'), 'utf8')
+      .replace(/__IUA_BRIDGE_PORT__/g, String(BRIDGE_PORT))
+      .replace(/__IUA_BRIDGE_HOST__/g, BRIDGE_HOST);
+    res.end(html);
   } else {
     res.writeHead(404); res.end();
   }
@@ -199,15 +206,22 @@ browserWss.on('connection', (ws) => {
             break;
           }
           running = true;
+          const perfOn = !!msg.perf;
+          const xctraceOn = !!msg.xctrace;
+          let perfStopped = false;
+          let xctraceSession = null;
+          let doneSent = false;
+          const finishRun = (payload) => {
+            if (doneSent) return;
+            doneSent = true;
+            broadcast({ type: 'run_done', ...payload });
+          };
           try {
-            const perfOn = !!msg.perf;
-            const xctraceOn = !!msg.xctrace;
             broadcast({ type: 'run_start', total: steps.length, perf: perfOn, xctrace: xctraceOn });
 
             // App 端性能采样
             if (perfOn) await sendToApp('perf_start', { interval: 0.5 });
             // xctrace 宿主侧录制（环境受限自动降级，不阻塞测试）
-            let xctraceSession = null;
             try {
               if (xctraceOn) {
                 const udid = await detectBootedSimulator();
@@ -224,8 +238,12 @@ browserWss.on('connection', (ws) => {
               const outcome = await runSteps(steps, sendToApp, (r) => broadcast({ type: 'run_progress', ...r }));
 
               const perfData = perfOn ? ((await sendToApp('perf_stop')).data ?? null) : null;
+              if (perfOn) perfStopped = true;
               let xctraceResult = null;
-              if (xctraceSession) xctraceResult = await xctraceSession.stop();
+              if (xctraceSession) {
+                try { xctraceResult = await xctraceSession.stop(); }
+                catch (e) { broadcast({ type: 'app_log', level: 2, message: `xctrace 停止失败（已降级）: ${e.message}` }); }
+              }
 
               // 失败时抓现场截图推给浏览器
               let failShot = null;
@@ -233,8 +251,15 @@ browserWss.on('connection', (ws) => {
                 const s = await sendToApp('screenshot', { quality: 1 });
                 if (s.ok) failShot = `data:image/png;base64,${s.data.image}`;
               }
-              broadcast({ type: 'run_done', passed: outcome.passed, total: outcome.total, ok: outcome.ok,
+              finishRun({ passed: outcome.passed, total: outcome.total, ok: outcome.ok,
                           failShot, perf: perfData, xctrace: xctraceResult });
+            } catch (runError) {
+              if (perfOn && !perfStopped) {
+                try { await sendToApp('perf_stop'); } catch { /* ignore */ }
+                perfStopped = true;
+              }
+              finishRun({ passed: 0, total: steps.length, ok: false,
+                          error: `运行异常: ${runError.message}`, perf: null, xctrace: null });
             } finally {
               // 异常路径也必须停止 xctrace，避免孤儿录制进程
               if (xctraceSession) { try { xctraceSession.abort(); } catch {} }
@@ -256,8 +281,8 @@ browserWss.on('connection', (ws) => {
 });
 
 httpServer.on('error', (e) => handleListenError(e, HTTP_PORT));
-httpServer.listen(HTTP_PORT, () => {
-  console.log(`[gui] 控制台已启动: http://localhost:${HTTP_PORT}`);
+httpServer.listen(HTTP_PORT, GUI_HOST, () => {
+  console.log(`[gui] 控制台已启动: http://${GUI_HOST}:${HTTP_PORT}`);
 });
 
 // ---------------------------------------------------------------- Appium / WebDriver 桥（与 GUI 共存）
@@ -276,8 +301,8 @@ try {
       console.log('[gui] Appium 桥错误:', e.message);
     }
   });
-  appiumBridge.server.listen(BRIDGE_PORT, () => {
-    console.log(`[gui] Appium 桥已启动: http://localhost:${BRIDGE_PORT}`);
+  appiumBridge.server.listen(BRIDGE_PORT, BRIDGE_HOST, () => {
+    console.log(`[gui] Appium 桥已启动: http://${BRIDGE_HOST}:${BRIDGE_PORT}`);
   });
 } catch (e) {
   console.log('[gui] Appium 桥初始化失败:', e.message);
@@ -291,7 +316,7 @@ try {
     console.log('    处理: ./build.sh --boot-only   （或在 Xcode 里启动一个模拟器）');
     return;
   }
-  const installed = await execFileAsync('xcrun', ['simctl', 'get_app_container', udid, 'com.iuiauto.agent'], { env: { ...process.env, DEVELOPER_DIR } }).catch(() => null);
+  const installed = await execFileAsync('xcrun', ['simctl', 'get_app_container', udid, APP_BUNDLE_ID], { env: { ...process.env, DEVELOPER_DIR } }).catch(() => null);
   if (!installed) {
     console.log(`[gui] ⚠ 模拟器(${udid.slice(0, 8)}…)上未安装 IUIAuto App。`);
     console.log('    处理: ./build.sh   （一键编译+安装+启动）');

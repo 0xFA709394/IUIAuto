@@ -146,6 +146,27 @@ export function expandVariables(text) {
     .replace(/\$\{env\.([A-Za-z_][A-Za-z0-9_]*)\}/g, (_, k) => process.env[k] ?? '');
 }
 
+/** 按空白切分参数，支持用单/双引号包住含空格的定位表达式 */
+function splitArgs(text) {
+  const args = [];
+  let current = '';
+  let quote = 0;
+  for (const ch of text) {
+    if (quote) {
+      if (ch === quote) quote = 0;
+      else current += ch;
+    } else if (ch === '"' || ch === "'") {
+      quote = ch;
+    } else if (/\s/.test(ch)) {
+      if (current) { args.push(current); current = ''; }
+    } else {
+      current += ch;
+    }
+  }
+  if (current) args.push(current);
+  return args;
+}
+
 export function parseScript(text) {
   text = expandVariables(text);
   const steps = [];
@@ -161,7 +182,7 @@ export function parseScript(text) {
     const sp = line.indexOf(' ');
     const cmdWord = (sp === -1 ? line : line.slice(0, sp)).toLowerCase();
     const rest = sp === -1 ? '' : line.slice(sp + 1).trim();
-    const args = rest.split(/\s+/).filter(Boolean);
+    const args = rest ? splitArgs(rest) : [];
 
     // ---- 循环块语法（在别名表之前处理）----
     if (cmdWord === '循环' || cmdWord === 'loop' || cmdWord === 'repeat') {
@@ -291,7 +312,7 @@ export function parseScript(text) {
             params.duration = maybeDur;   // 末尾 ≤3 的小数视为时长
           }
         }
-        steps.push(action('swipe', params, lineNo));
+        emit(action('swipe', params, lineNo));
         break;
       }
       case 'waitappear': case 'waitdisappear': {
@@ -301,40 +322,46 @@ export function parseScript(text) {
         if (isNumber(args[1])) params.timeout = Math.min(+args[1], 60);
         const loc = parseLocatorExpression(args[0]);
         if (loc) {
-          steps.push(action('wait_for_element', { ...loc, ...params }, lineNo));
+          emit(action('wait_for_element', { ...loc, ...params }, lineNo));
         } else {
-          steps.push(action('wait_for', { identifier: args[0], ...params }, lineNo));
+          emit(action('wait_for', { identifier: args[0], ...params }, lineNo));
         }
         break;
       }
       case 'scrollto': {
         if (!args[0]) throw new Error(`第 ${lineNo} 行: 滚动到 需要 identifier`);
         const loc = parseLocatorExpression(args[0]);
-        if (loc) steps.push(action('element_action', { ...loc, action: 'scroll_to' }, lineNo));
-        else steps.push(action('scroll_to', { identifier: args[0] }, lineNo));
+        if (loc) emit(action('element_action', { ...loc, action: 'scroll_to' }, lineNo));
+        else emit(action('scroll_to', { identifier: args[0] }, lineNo));
         break;
       }
       case 'scrolltop': case 'scrollbottom': {
         const loc = args[0] ? locatorFromToken(args[0]) : { using: 'class name', value: 'UIScrollView', index: 0 };
         const actionName = canonical === 'scrolltop' ? 'scroll_to_top' : 'scroll_to_bottom';
-        steps.push(action('element_action', { ...loc, action: actionName }, lineNo));
+        emit(action('element_action', { ...loc, action: actionName }, lineNo));
         break;
       }
       case 'avalue': {
         if (args.length < 3) throw new Error(`第 ${lineNo} 行: 断言值 需要 identifier [包含|等于] 值`);
-        const kind = args[1] === '包含' ? 'value_contains' : 'value_equals';
-        const at = rest.indexOf(args[1]);
-        const value = at >= 0 ? rest.slice(at + args[1].length).trim() : args.slice(2).join(' ');
+        const opWord = args[1];
+        const isContains = opWord === '包含' || opWord === 'contains';
+        const isEquals = opWord === '等于' || opWord === 'equals';
+        if (!isContains && !isEquals) {
+          throw new Error(`第 ${lineNo} 行: 断言值 第二个参数须为 包含/等于（实际 "${opWord}"）`);
+        }
+        const kind = isContains ? 'value_contains' : 'value_equals';
+        const at = rest.indexOf(opWord);
+        const value = at >= 0 ? rest.slice(at + opWord.length).trim() : args.slice(2).join(' ');
         const loc = parseLocatorExpression(args[0]);
-        if (loc) steps.push({ type: 'assert', kind, locator: loc, value, line: lineNo });
-        else steps.push(assert(kind, args[0], value, lineNo));
+        if (loc) emit({ type: 'assert', kind, locator: loc, value, line: lineNo });
+        else emit(assert(kind, args[0], value, lineNo));
         break;
       }
       case 'alook': {
         // 断言外观 <名称> [阈值%]：视觉回归（基线不存在时自动建立）
         if (!args[0]) throw new Error(`第 ${lineNo} 行: 断言外观 需要 基线名称 [阈值%]`);
-        steps.push({ type: 'look', name: args[0],
-                     threshold: isNumber(args[1]) ? +args[1] : 1.0, line: lineNo });
+        emit({ type: 'look', name: args[0],
+               threshold: isNumber(args[1]) ? +args[1] : 1.0, line: lineNo });
         break;
       }
       case 'pinch': {
@@ -425,8 +452,8 @@ export function parseScript(text) {
         }
         const at = rest.indexOf(opWord);
         const value = at >= 0 ? rest.slice(at + opWord.length).trim() : args.slice(3).join(' ');
-        steps.push({ type: 'assert', kind: isContains ? 'attribute_contains' : 'attribute_equals',
-                     locator: loc, attribute, value, line: lineNo });
+        emit({ type: 'assert', kind: isContains ? 'attribute_contains' : 'attribute_equals',
+               locator: loc, attribute, value, line: lineNo });
         break;
       }
       case 'adisplayed': case 'ahidden': case 'aenabled': case 'adisabled': case 'aselected': {
@@ -434,17 +461,17 @@ export function parseScript(text) {
         const loc = locatorFromToken(args[0]);
         const kindMap = { adisplayed: 'displayed', ahidden: 'hidden',
                           aenabled: 'enabled', adisabled: 'disabled', aselected: 'selected' };
-        steps.push({ type: 'assert', kind: kindMap[canonical], locator: loc, value: null, line: lineNo });
+        emit({ type: 'assert', kind: kindMap[canonical], locator: loc, value: null, line: lineNo });
         break;
       }
       case 'source': {
-        steps.push({ type: 'source', file: args[0] || null, line: lineNo });
+        emit({ type: 'source', file: args[0] || null, line: lineNo });
         break;
       }
       case 'eshot': {
         if (!args[0]) throw new Error(`第 ${lineNo} 行: 元素截图 需要 identifier 或定位表达式`);
-        steps.push({ type: 'element_shot', locator: locatorFromToken(args[0]),
-                     file: args[1] || 'element.png', line: lineNo });
+        emit({ type: 'element_shot', locator: locatorFromToken(args[0]),
+               file: args[1] || 'element.png', line: lineNo });
         break;
       }
       case 'clipboard': {

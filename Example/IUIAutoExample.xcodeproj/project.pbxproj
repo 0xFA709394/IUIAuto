@@ -9,29 +9,29 @@
 /* Begin PBXBuildFile section */
 		1D1FE8CB2D90F0DF843DCF8C /* DemoViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 0398DDD708A75BF88252197B /* DemoViewController.m */; };
 		45BDB2CD5E7342E16BFCCD75 /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = 3B30962B4AF37C70CC088609 /* main.m */; };
-		4A2FADA1C6D748F90E11282B /* Pods_IUIAutoExample.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0E6E6F7AE60DF1CC09F59B2B /* Pods_IUIAutoExample.framework */; };
+		BE27FE566DCE80FE407F5477 /* Pods_IUIAutoExample.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = FB3C99277A6D677E47994792 /* Pods_IUIAutoExample.framework */; };
 		FBDEED70280D92DFD88C2E03 /* AppDelegate.m in Sources */ = {isa = PBXBuildFile; fileRef = 2B732E36F3AB261481FA4334 /* AppDelegate.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		021B976E9C6863BD26DAEF3B /* AppDelegate.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AppDelegate.h; sourceTree = "<group>"; };
 		0398DDD708A75BF88252197B /* DemoViewController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = DemoViewController.m; sourceTree = "<group>"; };
-		0E6E6F7AE60DF1CC09F59B2B /* Pods_IUIAutoExample.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_IUIAutoExample.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		2B732E36F3AB261481FA4334 /* AppDelegate.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = AppDelegate.m; sourceTree = "<group>"; };
+		301D8B4EE720E191529B8673 /* Pods-IUIAutoExample.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-IUIAutoExample.debug.xcconfig"; path = "Target Support Files/Pods-IUIAutoExample/Pods-IUIAutoExample.debug.xcconfig"; sourceTree = "<group>"; };
 		3B30962B4AF37C70CC088609 /* main.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
-		481696DA96FC1753C9CC85B3 /* Pods-IUIAutoExample.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-IUIAutoExample.release.xcconfig"; path = "Target Support Files/Pods-IUIAutoExample/Pods-IUIAutoExample.release.xcconfig"; sourceTree = "<group>"; };
 		7F766213A5150725C961B185 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		957678620D448F8041E75871 /* IUIAutoExample.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = IUIAutoExample.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		B0646B53EBFCDC34102C27C8 /* Pods-IUIAutoExample.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-IUIAutoExample.debug.xcconfig"; path = "Target Support Files/Pods-IUIAutoExample/Pods-IUIAutoExample.debug.xcconfig"; sourceTree = "<group>"; };
+		CC1A3D505AE5C058050893C3 /* Pods-IUIAutoExample.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-IUIAutoExample.release.xcconfig"; path = "Target Support Files/Pods-IUIAutoExample/Pods-IUIAutoExample.release.xcconfig"; sourceTree = "<group>"; };
+		FB3C99277A6D677E47994792 /* Pods_IUIAutoExample.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_IUIAutoExample.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		FDC4CCD8D3C9324A5E04070F /* DemoViewController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = DemoViewController.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
-		519CC47D091EA83B48AA772C /* Frameworks */ = {
+		63DC60333A70AB59EC4E94AA /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				4A2FADA1C6D748F90E11282B /* Pods_IUIAutoExample.framework in Frameworks */,
+				BE27FE566DCE80FE407F5477 /* Pods_IUIAutoExample.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -64,24 +64,24 @@
 			children = (
 				18268AE3E6B1947ADC0E740E /* IUIAutoExample */,
 				087344965CE058177183757D /* Products */,
-				FC5CDC45250DB9E38B293A5F /* Pods */,
-				AB1B204D6132700EACE0347E /* Frameworks */,
+				F43777F7838246F9CB5E7C26 /* Pods */,
+				C768DC7828B5280D53AD8D88 /* Frameworks */,
 			);
 			sourceTree = "<group>";
 		};
-		AB1B204D6132700EACE0347E /* Frameworks */ = {
+		C768DC7828B5280D53AD8D88 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
-				0E6E6F7AE60DF1CC09F59B2B /* Pods_IUIAutoExample.framework */,
+				FB3C99277A6D677E47994792 /* Pods_IUIAutoExample.framework */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
 		};
-		FC5CDC45250DB9E38B293A5F /* Pods */ = {
+		F43777F7838246F9CB5E7C26 /* Pods */ = {
 			isa = PBXGroup;
 			children = (
-				B0646B53EBFCDC34102C27C8 /* Pods-IUIAutoExample.debug.xcconfig */,
-				481696DA96FC1753C9CC85B3 /* Pods-IUIAutoExample.release.xcconfig */,
+				301D8B4EE720E191529B8673 /* Pods-IUIAutoExample.debug.xcconfig */,
+				CC1A3D505AE5C058050893C3 /* Pods-IUIAutoExample.release.xcconfig */,
 			);
 			name = Pods;
 			path = Pods;
@@ -94,9 +94,9 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 33FD507555EA453A1F0B8C12 /* Build configuration list for PBXNativeTarget "IUIAutoExample" */;
 			buildPhases = (
-				3C577E7AC9A82A2515392DB1 /* [CP] Check Pods Manifest.lock */,
+				F48E0ED7199E656E70537E4E /* [CP] Check Pods Manifest.lock */,
 				6BC3DA3904D912F24A770B7F /* Sources */,
-				519CC47D091EA83B48AA772C /* Frameworks */,
+				63DC60333A70AB59EC4E94AA /* Frameworks */,
 			);
 			buildRules = (
 			);
@@ -138,7 +138,7 @@
 /* End PBXProject section */
 
 /* Begin PBXShellScriptBuildPhase section */
-		3C577E7AC9A82A2515392DB1 /* [CP] Check Pods Manifest.lock */ = {
+		F48E0ED7199E656E70537E4E /* [CP] Check Pods Manifest.lock */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -178,7 +178,7 @@
 /* Begin XCBuildConfiguration section */
 		03913B26FA4B97F1956388C6 /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 481696DA96FC1753C9CC85B3 /* Pods-IUIAutoExample.release.xcconfig */;
+			baseConfigurationReference = CC1A3D505AE5C058050893C3 /* Pods-IUIAutoExample.release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
@@ -315,7 +315,7 @@
 		};
 		D24BEF584B98974D8A161CE7 /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = B0646B53EBFCDC34102C27C8 /* Pods-IUIAutoExample.debug.xcconfig */;
+			baseConfigurationReference = 301D8B4EE720E191529B8673 /* Pods-IUIAutoExample.debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";

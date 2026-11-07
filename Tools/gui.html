@@ -232,7 +232,7 @@
         <div class="card">
           <h3>WebDriver 桥</h3>
           <div class="row">
-            <span class="inline">标准 Appium 客户端连接地址：<code id="appiumBridgeUrl">http://localhost:4723</code>（capabilities: platformName=iOS, appium:automationName=IUIAuto）</span>
+            <span class="inline">标准 Appium 客户端连接地址：<code id="appiumBridgeUrl" data-host="__IUA_BRIDGE_HOST__" data-port="__IUA_BRIDGE_PORT__">http://localhost:__IUA_BRIDGE_PORT__</code>（capabilities: platformName=iOS, appium:automationName=IUIAuto）</span>
           </div>
         </div>
         <div class="card">
@@ -338,7 +338,14 @@ let currentScript = null; // 当前加载的脚本名
 // ---------------------------------------------------------------- WebSocket
 function connect() {
   const bridgeEl = document.getElementById('appiumBridgeUrl');
-  if (bridgeEl) bridgeEl.textContent = `http://${location.hostname || 'localhost'}:4723`;
+  if (bridgeEl) {
+    const bridgePort = bridgeEl.dataset.port || '4723';
+    let bridgeHost = bridgeEl.dataset.host || location.hostname || 'localhost';
+    if (bridgeHost === '0.0.0.0' || bridgeHost === '::' || bridgeHost === '[::]') {
+      bridgeHost = location.hostname || 'localhost';
+    }
+    bridgeEl.textContent = `http://${bridgeHost}:${bridgePort}`;
+  }
   ws = new WebSocket(`ws://${location.host}/ws`);
   ws.onopen = () => { refreshShot(0); loadTree(); send({ type: 'dsl_list' }); };
   ws.onmessage = (ev) => {
@@ -526,7 +533,14 @@ function manualPress() {
 }
 function manualType() {
   const id = val('typeId');
-  send({ type: 'send', action: 'type_text', params: id ? { identifier: id, text: val('typeText') } : { text: val('typeText') } });
+  const text = val('typeText');
+  if (id) {
+    // 与 DSL「输入」一致：先清空再写入；无标识时保留当前焦点追加输入
+    send({ type: 'send', action: 'element_action',
+           params: { using: 'accessibility id', value: id, action: 'set_text', text } });
+  } else {
+    send({ type: 'send', action: 'type_text', params: { text } });
+  }
 }
 function manualClear() { send({ type: 'send', action: 'clear_text', params: { identifier: val('typeId') } }); }
 function manualSwipe() {

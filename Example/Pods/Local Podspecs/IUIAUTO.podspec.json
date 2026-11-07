@@ -21,6 +21,7 @@
   "swift_versions": "5.0",
   "source_files": [
     "Sources/IUIAUTO.h",
+    "Sources/IUIAUTOVersion.m",
     "Sources/Core/**/*.{h,m}",
     "Sources/Actions/**/*.{h,m}",
     "Sources/UI/**/*.{h,m}"

@@ -19,6 +19,10 @@ wss.on('connection',async s=>{
 
   console.log('── A. press_key 边界 ──');
   let r;
+  await send('dismiss_keyboard');
+  // 清掉上一次运行可能残留的配置页
+  await send('tap_view',{identifier:'btn.config.done'});
+  await new Promise(x=>setTimeout(x,800));
   r = await send('press_key',{key:'return'});                       // 无焦点（此前无输入交互）
   check('无焦点 press_key → 明确错误不崩', !r.ok && /没有可接收/.test(r.error||''), r.error?.slice(0,30));
   r = await send('press_key',{key:'x',identifier:'no.such.field'});
@@ -58,7 +62,7 @@ wss.on('connection',async s=>{
   await new Promise(x=>setTimeout(x,1200));
   for (let i=0;i<5;i++) {
     await send('tap_view',{identifier:'switch.config.floating'});
-    await new Promise(x=>setTimeout(x,300));
+    await new Promise(x=>setTimeout(x,600));
   }
   const alive = await send('ping');
   check('开关快速抖动×5 后 App 存活', alive.ok);

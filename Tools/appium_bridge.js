@@ -38,7 +38,8 @@ import { translateActions, ELEMENT_KEY, extractElementId } from './iua_webdriver
 
 const DEFAULT_BRIDGE_PORT = +(process.env.BRIDGE_PORT || 4723);
 const DEFAULT_APP_PORT = +(process.env.APP_PORT || 9800);
-const AGENT_VERSION = '1.0.0';
+const DEFAULT_BRIDGE_HOST = process.env.BRIDGE_HOST || '127.0.0.1';
+const AGENT_VERSION = '0.3.0';
 
 const SUPPORTED_LOCATORS = new Set([
   'accessibility id', 'id', 'identifier', 'name', 'label', 'text',
@@ -107,6 +108,56 @@ function normalizeLocator(using, value) {
     return { using: '-ios predicate string', value: `label CONTAINS "${escaped}"` };
   }
   return { using: raw, value: text };
+}
+
+function escapeXPathLiteral(value) {
+  return String(value ?? '').replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+}
+
+/// 把子元素查找转换为“父元素 XPath + 后代轴”的 XPath；无法转换时返回 null（调用方用矩形过滤降级）
+function scopedChildXPath(parentPath, using, value) {
+  if (!parentPath) return null;
+  const key = String(using || '').trim().toLowerCase();
+  const text = String(value ?? '');
+  if (key === 'xpath') {
+    if (text.startsWith('//')) return `${parentPath}${text}`;
+    if (text.startsWith('/')) return `${parentPath}${text}`;
+    if (text.startsWith('.//')) return `${parentPath}${text.slice(1)}`;
+    if (text.startsWith('./')) return `${parentPath}${text.slice(1)}`;
+    return `${parentPath}//${text}`;
+  }
+  const attrByStrategy = {
+    'accessibility id': 'identifier',
+    'id': 'identifier',
+    'identifier': 'identifier',
+    'name': 'name',
+    'label': 'label',
+    'text': 'text',
+  };
+  const attr = attrByStrategy[key];
+  if (attr) {
+    return `${parentPath}//*[@${attr}="${escapeXPathLiteral(text)}"]`;
+  }
+  if (key === 'class name' || key === 'class' || key === 'classname' || key === 'tag name') {
+    return `${parentPath}//${text}`;
+  }
+  if (key === '-ios predicate string' || key === 'predicate' || key === 'predicate string') {
+    return `${parentPath}//*[${text}]`;
+  }
+  return null;
+}
+
+function rectContains(container, child) {
+  if (!container || !child) return true;
+  const cx = Number(container.x) || 0;
+  const cy = Number(container.y) || 0;
+  const cw = Number(container.width) || 0;
+  const ch = Number(container.height) || 0;
+  const x = Number(child.x) || 0;
+  const y = Number(child.y) || 0;
+  const w = Number(child.width) || 0;
+  const h = Number(child.height) || 0;
+  return x + w >= cx && x <= cx + cw && y + h >= cy && y <= cy + ch;
 }
 
 function elementHandle(id) {
@@ -197,6 +248,7 @@ export function createAppiumBridge(options = {}) {
   }
 
   let session = null;
+  let creatingSession = false;
 
   async function appSend(action, params = {}, timeoutSec = 20) {
     const result = await send(action, params, timeoutSec);
@@ -273,7 +325,52 @@ export function createAppiumBridge(options = {}) {
     });
   }
 
-  async function elementOp(record, action, params = {}, timeoutSec = 25) {
+  async function findChildElements(currentSession, parentRecord, using, value) {
+    const parentSnapshot = parentRecord.snapshot || {};
+    let parentXPath = parentSnapshot.xpath;
+    if (!parentXPath) {
+      const attr = await elementOp(parentRecord, 'get_attribute', { attribute: 'xpath' });
+      parentXPath = attr?.value;
+    }
+    const locator = normalizeLocator(using, value);
+    const scoped = scopedChildXPath(parentXPath, locator.using, locator.value);
+    if (scoped) {
+      const result = await findElements(currentSession, 'xpath', scoped);
+      if (result.elements.length > 0) {
+        return { ...result, locator: { using: 'xpath', value: scoped } };
+      }
+    }
+    // 降级：全局查找后按父元素矩形过滤（能覆盖 accessibility id/class 等常见场景）
+    const global = await findElements(currentSession, locator.using, locator.value);
+    if (!global.elements.length) return global;
+    const parentRect = parentSnapshot.rect ||
+      (await elementOp(parentRecord, 'get_rect'));
+    const filtered = global.elements.filter((element) => rectContains(parentRect, element.rect));
+    // 不做“过滤为空就回退全局”的降级，避免把父元素之外的元素当作子元素返回
+    return { ...global, elements: filtered };
+  }
+
+  function sameElementSnapshot(expected, actual) {
+    if (!expected || !actual) return true;
+    const expectedXPath = expected.xpath ? String(expected.xpath) : '';
+    const actualXPath = actual.xpath ? String(actual.xpath) : '';
+    if (expectedXPath && actualXPath && expectedXPath === actualXPath) return true;
+    const expectedIdentifier = String(expected.identifier || '');
+    const actualIdentifier = String(actual.identifier || '');
+    if (expectedIdentifier && actualIdentifier && expectedIdentifier === actualIdentifier) return true;
+    // 没有 identifier/xpath 时退化为类型 + 矩形 + name/label 指纹
+    if (String(expected.type || '') !== String(actual.type || '')) return false;
+    if (String(expected.name || '') !== String(actual.name || '')) return false;
+    if (String(expected.label || '') !== String(actual.label || '')) return false;
+    const ex = expected.rect || {};
+    const ax = actual.rect || {};
+    return number(ex.x) === number(ax.x) &&
+      number(ex.y) === number(ax.y) &&
+      number(ex.width) === number(ax.width) &&
+      number(ex.height) === number(ax.height);
+  }
+
+  async function rawElementOp(record, action, params = {}, timeoutSec = 25) {
     const result = await send('element_action', {
       using: record.using,
       value: record.value,
@@ -292,6 +389,18 @@ export function createAppiumBridge(options = {}) {
       throw wdError('element not interactable', message, 400);
     }
     return result.data;
+  }
+
+  async function elementOp(record, action, params = {}, timeoutSec = 25) {
+    // 句柄只保存 locator+index；执行动作前先无副作用地取一次当前属性，确认
+    // 该 index 仍指向同一元素，避免页面变化后静默操作到别的元素。
+    if (record.snapshot && action !== 'get_attributes') {
+      const current = await rawElementOp(record, 'get_attributes', {}, timeoutSec);
+      if (!sameElementSnapshot(record.snapshot, current)) {
+        throw wdError('stale element reference', '元素已重新创建或位置发生变化，请重新查找', 404);
+      }
+    }
+    return rawElementOp(record, action, params, timeoutSec);
   }
 
   async function resolveElementRect(elementId) {
@@ -346,34 +455,42 @@ export function createAppiumBridge(options = {}) {
       throw wdError('session not created',
         `已有活动会话 ${session.id}；请先 DELETE /session/${session.id} 或重启桥`, 500);
     }
-    const body = await readJSON(req);
-    const clientCaps = parseCapabilities(body);
-    const hello = await waitForApp(sessionWaitMs);
-    if (!hello) {
-      throw wdError('session not created',
-        'IUIAuto App 未连接：请确认 App 已安装/启动，且正连接对应 WebSocket 端口', 500);
+    if (creatingSession) {
+      throw wdError('session not created', '另一个会话正在创建中，请稍后重试', 500);
     }
-    let deviceInfo = null;
+    creatingSession = true;
     try {
-      deviceInfo = await appSend('device_info', {}, 10);
-    } catch {
-      deviceInfo = null;
+      const body = await readJSON(req);
+      const clientCaps = parseCapabilities(body);
+      const hello = await waitForApp(sessionWaitMs);
+      if (!hello) {
+        throw wdError('session not created',
+          'IUIAuto App 未连接：请确认 App 已安装/启动，且正连接对应 WebSocket 端口', 500);
+      }
+      let deviceInfo = null;
+      try {
+        deviceInfo = await appSend('device_info', {}, 10);
+      } catch {
+        deviceInfo = null;
+      }
+      const id = randomUUID();
+      session = {
+        id,
+        createdAt: Date.now(),
+        capabilities: sessionCapabilities(clientCaps, hello, deviceInfo),
+        implicitWait: 0,
+        pageLoadTimeout: 300000,
+        scriptTimeout: 30000,
+        settings: {},
+        elements: new Map(),
+        deviceInfo,
+        hello,
+      };
+      log(`session ${id} created (app=${hello.agent} v${hello.version}, actions=${hello.actions?.length ?? '?'})`);
+      sendJSON(res, { value: { sessionId: id, capabilities: session.capabilities } });
+    } finally {
+      creatingSession = false;
     }
-    const id = randomUUID();
-    session = {
-      id,
-      createdAt: Date.now(),
-      capabilities: sessionCapabilities(clientCaps, hello, deviceInfo),
-      implicitWait: 0,
-      pageLoadTimeout: 300000,
-      scriptTimeout: 30000,
-      settings: {},
-      elements: new Map(),
-      deviceInfo,
-      hello,
-    };
-    log(`session ${id} created (app=${hello.agent} v${hello.version}, actions=${hello.actions?.length ?? '?'})`);
-    sendJSON(res, { value: { sessionId: id, capabilities: session.capabilities } });
   }
 
   async function handleElement(req, res, currentSession, elementId, op) {
@@ -442,6 +559,19 @@ export function createAppiumBridge(options = {}) {
         throw error;
       }
     }
+    if (method === 'POST' && (key === 'element' || key === 'elements')) {
+      const body = await readJSON(req);
+      const { locator, elements } = await findChildElements(currentSession, record, body.using ?? body.using_, body.value);
+      if (key === 'element') {
+        if (elements.length === 0) {
+          throw wdError('no such element', `父元素下找不到子元素: ${body.using}=${body.value}`, 404);
+        }
+        const [id] = registerElements(currentSession, locator, [elements[0]]);
+        return sendJSON(res, { value: elementHandle(id) });
+      }
+      const ids = registerElements(currentSession, locator, elements);
+      return sendJSON(res, { value: ids.map(elementHandle) });
+    }
     if (method === 'POST' && key === 'scroll') {
       await elementOp(record, 'scroll_to');
       return sendJSON(res, { value: null });
@@ -479,13 +609,28 @@ export function createAppiumBridge(options = {}) {
       return { x: number(size.width) / 2, y: number(size.height) / 2, rect: null };
     };
 
+    // 元素内坐标：Appium 语义为相对元素左上角；未提供 x/y 时取元素中心
+    const pointInElement = async (record, opts) => {
+      const rect = await elementRect(record);
+      const hasOffset = opts.x !== undefined || opts.y !== undefined;
+      if (!hasOffset) {
+        return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
+      }
+      return { x: rect.x + number(opts.x), y: rect.y + number(opts.y) };
+    };
+
     switch (name) {
       case 'tap':
       case 'tapwithnumberoftaps': {
         const record = elementRecord();
         if (record) {
           const taps = number(options.numberOfTaps, 1);
-          await elementOp(record, taps >= 2 ? 'double_click' : 'click');
+          if (options.x !== undefined || options.y !== undefined) {
+            const point = await pointInElement(record, options);
+            await appSend(taps >= 2 ? 'double_tap' : 'tap', { x: point.x, y: point.y }, 15);
+          } else {
+            await elementOp(record, taps >= 2 ? 'double_click' : 'click');
+          }
         } else {
           const taps = number(options.numberOfTaps, 1);
           if (taps >= 2) {
@@ -499,7 +644,12 @@ export function createAppiumBridge(options = {}) {
       case 'doubletap': {
         const record = elementRecord();
         if (record) {
-          await elementOp(record, 'double_click');
+          if (options.x !== undefined || options.y !== undefined) {
+            const point = await pointInElement(record, options);
+            await appSend('double_tap', { x: point.x, y: point.y }, 15);
+          } else {
+            await elementOp(record, 'double_click');
+          }
         } else {
           await appSend('double_tap', { x: number(options.x), y: number(options.y) }, 15);
         }
@@ -509,7 +659,12 @@ export function createAppiumBridge(options = {}) {
         const duration = Math.max(number(options.duration, 1), 0.1);
         const record = elementRecord();
         if (record) {
-          await elementOp(record, 'long_click', { duration });
+          if (options.x !== undefined || options.y !== undefined) {
+            const point = await pointInElement(record, options);
+            await appSend('long_press', { x: point.x, y: point.y, duration }, 20);
+          } else {
+            await elementOp(record, 'long_click', { duration });
+          }
         } else {
           await appSend('long_press', { x: number(options.x), y: number(options.y), duration }, 20);
         }
@@ -550,13 +705,17 @@ export function createAppiumBridge(options = {}) {
       case 'dragfromtoforduration': {
         let fromX = number(options.fromX);
         let fromY = number(options.fromY);
-        const toX = number(options.toX);
-        const toY = number(options.toY);
+        let toX = number(options.toX);
+        let toY = number(options.toY);
         const record = elementRecord();
         if (record) {
           const rect = await elementRect(record);
           fromX += rect.x;
           fromY += rect.y;
+          // Appium 的 drag 坐标相对元素左上角；toX/toY 也需要平移
+          // 若客户端传的是绝对坐标，可通过不传 element 使用绝对坐标模式
+          toX += rect.x;
+          toY += rect.y;
         }
         await appSend('swipe', {
           fromX, fromY, toX, toY,
@@ -728,6 +887,22 @@ export function createAppiumBridge(options = {}) {
       const ids = registerElements(currentSession, locator, elements);
       return sendJSON(res, { value: ids.map(elementHandle) });
     }
+    if (method === 'GET' && rest[0] === 'element' && rest[1] === 'active' && rest.length === 2) {
+      const data = await appSend('active_element');
+      if (!data?.found) {
+        throw wdError('no such element', '当前没有焦点元素', 404);
+      }
+      const id = randomUUID();
+      currentSession.elements.set(id, {
+        id,
+        using: 'xpath',
+        value: data.xpath,
+        index: 0,
+        snapshot: data,
+        createdAt: Date.now(),
+      });
+      return sendJSON(res, { value: elementHandle(id) });
+    }
     if (rest[0] === 'element' && rest[1]) {
       return handleElement(req, res, currentSession, rest[1], rest.slice(2));
     }
@@ -881,7 +1056,8 @@ export function createAppiumBridge(options = {}) {
       }
       return sendJSON(res, { value: null });
     }
-    if (method === 'POST' && key === 'appium/device/query_app_state') {
+    if (method === 'POST' &&
+        (key === 'appium/device/app_state' || key === 'appium/device/query_app_state')) {
       const body = await readJSON(req);
       const bundleId = body.bundleId || body.appId || '';
       if (bundleId && bundleId !== currentSession.capabilities['appium:bundleId']) {
@@ -890,10 +1066,28 @@ export function createAppiumBridge(options = {}) {
       const data = await appSend('app_state');
       return sendJSON(res, { value: data?.state ?? 4 });
     }
+    if (method === 'POST' && key === 'appium/device/app_installed') {
+      const body = await readJSON(req);
+      const bundleId = body.bundleId || body.appId || '';
+      return sendJSON(res, { value: !bundleId || bundleId === currentSession.capabilities['appium:bundleId'] });
+    }
     if (method === 'POST' && (key === 'appium/device/terminate_app' ||
         key === 'appium/device/background_app')) {
       throw wdError('unsupported operation',
         'IUIAuto 为进程内 Agent，不支持 terminateApp/backgroundApp（可用 simctl 在宿主侧操作）', 500);
+    }
+    if (method === 'POST' && (key === 'appium/device/install_app' ||
+        key === 'appium/device/remove_app' ||
+        key === 'appium/device/push_file' ||
+        key === 'appium/device/pull_file' ||
+        key === 'appium/device/pull_folder')) {
+      throw wdError('unsupported operation',
+        'IUIAuto 为进程内 Agent，不支持 App 安装/文件传输（请在宿主侧使用 simctl 或 Xcode）', 500);
+    }
+    if (method === 'POST' && (key === 'appium/start_recording_screen' ||
+        key === 'appium/stop_recording_screen')) {
+      throw wdError('unsupported operation',
+        'IUIAuto 暂不支持屏幕录制；可在宿主侧使用 xcrun simctl io recordVideo', 500);
     }
     if (method === 'POST' && (key === 'appium/device/lock' ||
         key === 'appium/device/unlock' || key === 'appium/device/is_locked')) {
@@ -991,7 +1185,12 @@ export function createAppiumBridge(options = {}) {
     } catch {
       throw wdError('invalid argument', '非法 URL', 400);
     }
-    let pathname = decodeURIComponent(url.pathname || '/');
+    let pathname;
+    try {
+      pathname = decodeURIComponent(url.pathname || '/');
+    } catch {
+      throw wdError('invalid argument', 'URL 编码非法', 400);
+    }
     pathname = pathname.replace(/^\/wd\/hub(?=\/|$)/, '') || '/';
 
     if (pathname === '/' || pathname === '/health') {
@@ -1064,6 +1263,7 @@ async function main() {
   const appPortArg = args.find((arg) => arg.startsWith('--app-port='));
   const bridgePort = portArg ? +portArg.split('=')[1] : DEFAULT_BRIDGE_PORT;
   const appPort = appPortArg ? +appPortArg.split('=')[1] : DEFAULT_APP_PORT;
+  const bridgeHost = process.env.BRIDGE_HOST || DEFAULT_BRIDGE_HOST;
 
   await ensurePortFree(appPort, { takeover, label: 'App 连接端口' });
   await ensurePortFree(bridgePort, { takeover, label: 'WebDriver HTTP 端口' });
@@ -1139,9 +1339,9 @@ async function main() {
     log: (...values) => console.log('[appium-bridge]', ...values),
   });
   bridge.server.on('error', (error) => handleListenError(error, bridgePort));
-  await new Promise((resolve) => bridge.server.listen(bridgePort, resolve));
+  await new Promise((resolve) => bridge.server.listen(bridgePort, bridgeHost, resolve));
 
-  console.log(`[appium-bridge] WebDriver 端点: http://127.0.0.1:${bridgePort}`);
+  console.log(`[appium-bridge] WebDriver 端点: http://${bridgeHost}:${bridgePort}`);
   console.log(`[appium-bridge] 用法: appium 客户端 remote URL = http://127.0.0.1:${bridgePort}`);
   console.log('[appium-bridge] 能力: platformName=iOS, appium:automationName=IUIAuto');
 

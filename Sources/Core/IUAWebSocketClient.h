@@ -24,7 +24,7 @@ SOFTWARE.
 
 //
 //  通信层：基于 NSURLSessionWebSocketTask（iOS 13+，系统自带，零第三方依赖）
-//  - 自动重连（指数退避 1s → 30s）
+//  - 自动重连（指数退避 1s → 10s）
 //  - 心跳 ping（间隔见 IUAConfiguration）
 //  - JSON 文本帧收发
 //

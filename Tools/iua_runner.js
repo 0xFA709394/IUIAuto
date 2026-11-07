@@ -10,7 +10,8 @@
  * @param {Function} [onProgress] 可选 (result) => void
  *   result: { index, total, line, kind: 'action'|'shot'|'assert',
  *             desc, pass, detail, aborted }
- * @param {Object} [opts] { shotSaver: async (file, dataUrlBase64) => void }
+ * @param {Object} [opts] { shotSaver: async (file, dataUrlBase64) => void,
+ *                            textSaver: async (file, text) => void }
  * @returns {Promise<{passed:number, total:number, ok:boolean, results:Array}>}
  */
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
@@ -31,7 +32,16 @@ export async function runSteps(steps, send, onProgress = () => {}, opts = {}) {
     if (step.type === 'action') {
       kind = 'action';
       desc = `${step.action} ${JSON.stringify(step.params)}`;
-      const r = await send(step.action, step.params);
+      // 等待类动作可能超过 send 的默认 20s；把 App 端 timeout 一起传下去
+      let sendTimeout;
+      if (step.action === 'wait') {
+        sendTimeout = Math.min(120, Math.max(20, (Number(step.params?.seconds) || 1) + 5));
+      } else if (step.action === 'wait_for' || step.action === 'wait_for_element') {
+        sendTimeout = Math.min(120, Math.max(20, (Number(step.params?.timeout) || 10) + 5));
+      } else if (step.action === 'perf_stop') {
+        sendTimeout = 60;
+      }
+      const r = await send(step.action, step.params, sendTimeout);
       pass = r.ok;
       detail = r.ok ? '' : (r.error || '失败');
     } else if (step.type === 'shot') {
@@ -59,9 +69,14 @@ export async function runSteps(steps, send, onProgress = () => {}, opts = {}) {
       if (r.ok) {
         const source = r.data?.source ?? '';
         detail = `${source.length} 字节`;
-        if (step.file && opts.shotSaver) {
+        if (step.file && (opts.textSaver || opts.shotSaver)) {
           try {
-            await opts.shotSaver(step.file, Buffer.from(source, 'utf8').toString('base64'));
+            if (opts.textSaver) {
+              await opts.textSaver(step.file, source);
+            } else {
+              // 兼容旧调用方：文本按 UTF-8 转 base64 后复用 shotSaver 写盘
+              await opts.shotSaver(step.file, Buffer.from(source, 'utf8').toString('base64'));
+            }
             detail += ` → ${step.file}`;
           } catch (e) {
             detail += `（保存失败: ${e.message}）`;

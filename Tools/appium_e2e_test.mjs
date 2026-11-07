@@ -21,7 +21,7 @@ const keep = process.argv.includes('--keep');
 const BRIDGE_PORT = +(process.env.BRIDGE_PORT || 4724);
 const APP_PORT = +(process.env.APP_PORT || 9800);
 const BASE = `http://127.0.0.1:${BRIDGE_PORT}`;
-const BUNDLE_ID = 'com.iuiauto.example';
+const BUNDLE_ID = process.env.IUA_BUNDLE_ID || 'com.iuiauto.example';
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -29,7 +29,8 @@ async function detectBootedSimulator() {
   const { stdout } = await execFileAsync('xcrun', ['simctl', 'list', 'devices', 'booted'], {
     env: { ...process.env, DEVELOPER_DIR: process.env.DEVELOPER_DIR || '/Applications/Xcode.app/Contents/Developer' },
   }).catch(() => ({ stdout: '' }));
-  const match = stdout.match(/\(([0-9A-F-]{36})\)/);
+  const iosLine = stdout.split('\n').find((line) => /iPhone|iPad/.test(line) && /\([0-9A-F-]{36}\)/.test(line));
+  const match = iosLine ? iosLine.match(/\(([0-9A-F-]{36})\)/) : null;
   return match ? match[1] : null;
 }
 
@@ -133,6 +134,24 @@ async function main() {
     const button = await find('accessibility id', 'btn.counter');
     const label = await find('accessibility id', 'label.counter');
     check('按 accessibility id 查找元素', !!button && !!label);
+
+    const appState = await request('POST', `/session/${sessionId}/appium/device/app_state`, { bundleId: BUNDLE_ID });
+    check('Appium app_state 端点', appState.status === 200 && appState.json.value === 4,
+      JSON.stringify(appState.json.value));
+    const appInstalled = await request('POST', `/session/${sessionId}/appium/device/app_installed`, { bundleId: BUNDLE_ID });
+    check('Appium app_installed 端点', appInstalled.status === 200 && appInstalled.json.value === true);
+
+    const scrollParent = await find('accessibility id', 'scroll.demo');
+    if (scrollParent) {
+      const childResponse = await request('POST', `/session/${sessionId}/element/${scrollParent}/element`,
+        { using: 'accessibility id', value: 'btn.counter' });
+      const childId = childResponse.json?.value?.['element-6066-11e4-a52e-4f735466cecf'];
+      check('链式父元素查找子元素', childResponse.status === 200 && !!childId,
+        JSON.stringify(childResponse.json?.value?.error ?? ''));
+    } else {
+      check('链式父元素查找子元素', false, 'scroll.demo 不存在');
+    }
+
     const beforeText = await request('GET', `/session/${sessionId}/element/${label}/text`);
     const beforeCount = parseInt(String(beforeText.json.value).replace(/\D+/g, ''), 10) || 0;
     check('读取元素文本', beforeText.status === 200, `"${beforeText.json.value}"`);
@@ -151,12 +170,24 @@ async function main() {
     const unknownAttribute = await request('GET', `/session/${sessionId}/element/${button}/attribute/not-an-attribute`);
     check('未知属性返回 null', unknownAttribute.status === 200 && unknownAttribute.json.value === null);
 
+    const decimalXPath = await request('POST', `/session/${sessionId}/element`,
+      { using: 'xpath', value: '//XCUIElementTypeSlider[@value=50.0]' });
+    check('XPath 小数数值比较', decimalXPath.status === 200, JSON.stringify(decimalXPath.json?.value?.error ?? ''));
+    const appChain = await request('POST', `/session/${sessionId}/elements`,
+      { using: '-ios class chain', value: '**/XCUIElementTypeApplication/XCUIElementTypeWindow' });
+    const appChainCount = Array.isArray(appChain.json?.value) ? appChain.json.value.length : 0;
+    check('Class Chain Application 根节点', appChain.status === 200 && appChainCount > 0, `${appChainCount} 个`);
+
     const field = await find('xpath', '//XCUIElementTypeTextField[@name="field.input"]');
     check('XPath 定位输入框', !!field);
     await request('POST', `/session/${sessionId}/element/${field}/clear`);
     await request('POST', `/session/${sessionId}/element/${field}/value`, { text: 'Appium E2E 你好' });
     const fieldText = await request('GET', `/session/${sessionId}/element/${field}/text`);
     check('sendKeys / clear', fieldText.json.value === 'Appium E2E 你好', `"${fieldText.json.value}"`);
+
+    const active = await request('GET', `/session/${sessionId}/element/active`);
+    check('W3C active element 端点', active.status === 200 &&
+      !!active.json?.value?.['element-6066-11e4-a52e-4f735466cecf']);
 
     // 输入后键盘可能遮挡提交按钮，先收起
     await request('POST', `/session/${sessionId}/appium/device/hide_keyboard`);
@@ -232,9 +263,14 @@ async function main() {
     check('删除会话', removed.status === 200);
   } finally {
     if (!keep) {
-      child.kill('SIGTERM');
-      await sleep(500);
-      if (!child.killed) child.kill('SIGKILL');
+      if (child.exitCode === null) {
+        child.kill('SIGTERM');
+        await Promise.race([
+          new Promise((resolve) => child.once('exit', resolve)),
+          sleep(3000),
+        ]);
+      }
+      if (child.exitCode === null) child.kill('SIGKILL');
     }
     const passed = checks.filter((c) => c.pass).length;
     console.log(`\n结果: ${passed}/${checks.length} 通过 ${passed === checks.length ? '✅ PASS' : '❌ FAIL'}`);

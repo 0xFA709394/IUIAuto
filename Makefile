@@ -25,10 +25,10 @@ test:
 	@cd Tools && node mock_server.js --takeover --demo && node record_test.mjs && \
 	 node run_script.js --takeover replay_check.txt && \
 	 printf 'ping\n点击 btn.counter\n断言存在 btn.counter\n' > /tmp/mk_check.txt && \
-	 node run_script.js --takeover /tmp/mk_check.txt && node appium_bridge_test.mjs
+	 node run_script.js --takeover /tmp/mk_check.txt && node dsl_regression_test.mjs && node appium_bridge_test.mjs
 
 test-appium:
-	@cd Tools && node appium_bridge_test.mjs && node appium_e2e_test.mjs
+	@cd Tools && node dsl_regression_test.mjs && node appium_bridge_test.mjs && node appium_e2e_test.mjs
 
 clean:
 	@rm -rf ~/Library/Developer/Xcode/DerivedData/IUIAuto-* Tools/shot.png Tools/fail.png

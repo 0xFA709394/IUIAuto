@@ -28,7 +28,7 @@ const DEVELOPER_DIR = process.env.DEVELOPER_DIR || '/Applications/Xcode.app/Cont
  * { start(), stop() -> { ok, tracePath, sizeMB, reason?, summary? } }
  */
 export function startXctraceRecording({ deviceUDID, processName = 'IUIAuto', template = 'Time Profiler',
-                                        outputDir, appTimeoutSec = 180 }) {
+                                        outputDir }) {
   mkdirSync(outputDir, { recursive: true });
   const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
   const tracePath = join(outputDir, `${stamp}_${template.replace(/\s+/g, '-')}.trace`);
@@ -132,7 +132,8 @@ function reasonFromOutput(stderr, template) {
 export async function summarizeTrace(tracePath, processName) {
   const env = { ...process.env, DEVELOPER_DIR };
   // 1) toc 找可用 schema
-  const { stdout: toc } = await execFileAsync('xcrun', ['xctrace', 'export', '--input', tracePath, '--toc'], { env });
+  const { stdout: toc } = await execFileAsync('xcrun', ['xctrace', 'export', '--input', tracePath, '--toc'],
+    { env, timeout: 30000 });
   const schemas = [...toc.matchAll(/schema="([^"]+)"/g)].map((m) => m[1]);
 
   const preferred = ['sysmon-process', 'activity-monitor-process-ledger', 'time-profile'].find((s) => schemas.includes(s));
@@ -144,7 +145,7 @@ export async function summarizeTrace(tracePath, processName) {
   const { stdout: xml } = await execFileAsync('xcrun', [
     'xctrace', 'export', '--input', tracePath,
     '--xpath', `/trace-toc/run[@number="1"]/data/table[@schema="${preferred}"]`,
-  ], { env, maxBuffer: 64 * 1024 * 1024 });
+  ], { env, maxBuffer: 64 * 1024 * 1024, timeout: 60000 });
 
   const rows = [...xml.matchAll(/<row>([\s\S]*?)<\/row>/g)].map((m) => m[1]);
   const mine = rows.filter((r) => r.includes(processName));

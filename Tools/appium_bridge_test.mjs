@@ -136,6 +136,10 @@ function createFakeApp() {
           state.text = '';
           return { ok: true, data: { cleared: true } };
         }
+        if (elementAction === 'get_attributes') {
+          const list = elementsFor(params.value);
+          return { ok: true, data: list[0] || element() };
+        }
         if (elementAction === 'get_text') {
           const isLabel = String(params.value || '').includes('label.counter');
           return { ok: true, data: { text: isLabel ? `Count: ${state.counter}` : state.text } };
@@ -358,7 +362,7 @@ const fake = createFakeApp();
 const hello = {
   type: 'hello',
   agent: 'IUIAuto',
-  version: '1.0.0',
+  version: '0.3.0',
   environment: { systemVersion: '26.5', deviceModel: 'arm64' },
   actions: ['find_elements', 'element_action', 'page_source'],
 };
@@ -597,6 +601,23 @@ test('Appium device endpoints', async () => {
   assert.equal((await request('POST', `/session/${sessionId}/orientation`, { orientation: 'LANDSCAPE' })).json.value, 'LANDSCAPE');
   assert.equal((await request('GET', `/session/${sessionId}/window/rect`)).json.value.width, 402);
   assert.deepEqual((await request('GET', `/session/${sessionId}/contexts`)).json.value, ['NATIVE_APP']);
+});
+
+test('Appium app_state / app_installed endpoints', async () => {
+  let r = await request('POST', `/session/${sessionId}/appium/device/app_state`, { bundleId: 'com.iuiauto.example' });
+  assert.equal(r.status, 200);
+  assert.equal(r.json.value, 4);
+  r = await request('POST', `/session/${sessionId}/appium/device/app_installed`, { bundleId: 'com.iuiauto.example' });
+  assert.equal(r.json.value, true);
+  r = await request('POST', `/session/${sessionId}/appium/device/app_installed`, { bundleId: 'com.other' });
+  assert.equal(r.json.value, false);
+});
+
+test('W3C active element endpoint', async () => {
+  // 假 App 的 active_element 返回 xpath；active 端点应返回可用的元素句柄
+  const r = await request('GET', `/session/${sessionId}/element/active`);
+  assert.equal(r.status, 200);
+  assert.ok(r.json.value[ELEMENT_KEY]);
 });
 
 test('mobile: execute commands', async () => {

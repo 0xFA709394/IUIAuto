@@ -7,50 +7,51 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		004B2B8AE6A4E3EB8FF155F7C6DD3DD6 /* IUALogger.h in Headers */ = {isa = PBXBuildFile; fileRef = F9A5D16B6A8892BABB5F7A891A2350F0 /* IUALogger.h */; settings = {ATTRIBUTES = (Public, ); }; };
-		020FB86912F9399D28CF0D5636821103 /* IUAWebSocketClient.m in Sources */ = {isa = PBXBuildFile; fileRef = 8C2D8B23F94F6C1A455F1B6938AD54B9 /* IUAWebSocketClient.m */; };
 		07C97026A9292366C31FB6C4C79F5716 /* Pods-IUIAutoExample-umbrella.h in Headers */ = {isa = PBXBuildFile; fileRef = 6636AA8E2DF6C670588703F217BDEB8A /* Pods-IUIAutoExample-umbrella.h */; settings = {ATTRIBUTES = (Public, ); }; };
-		09D99B587BA6561EE32A77FF9B212B3A /* IUACommandResult.m in Sources */ = {isa = PBXBuildFile; fileRef = D9D2578518CB197FB3BE20EEFB5AE208 /* IUACommandResult.m */; };
-		0C78412300D9B02D6972C4FC96623626 /* IUARecorder.m in Sources */ = {isa = PBXBuildFile; fileRef = CABEABC1225F756BC17619FC513B0F3A /* IUARecorder.m */; };
-		0C97E61B9B23C487C6CC34704174926B /* IUAElementQuery.m in Sources */ = {isa = PBXBuildFile; fileRef = 83D8EAB35984F73A31990684601DBB0D /* IUAElementQuery.m */; };
-		0F4C587D43B60BAE26BECC8B1284BC0B /* IUAConfigViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = D8A9D3FEC1FCE586B1814102E6BE247B /* IUAConfigViewController.m */; };
-		138ADD89F77BC474CBB66E235CB93BC9 /* IUATextSynthesizer.m in Sources */ = {isa = PBXBuildFile; fileRef = 60B05DDC09DCB7D2A37D2CD85B183D61 /* IUATextSynthesizer.m */; };
-		195E655D60404D6786F6C38665A31BED /* IUAPerfSampler.h in Headers */ = {isa = PBXBuildFile; fileRef = FCAFA2A4C47A5BF9784605E89F1079EC /* IUAPerfSampler.h */; settings = {ATTRIBUTES = (Public, ); }; };
-		1AD9EEA7135C91C8BE39F4F92EF51A68 /* IUARecorder.h in Headers */ = {isa = PBXBuildFile; fileRef = 204A2C1A6A0EEE6810271311DE347973 /* IUARecorder.h */; settings = {ATTRIBUTES = (Public, ); }; };
-		20853A441594D2FFE75F4817A69FFA66 /* IUAEngine.h in Headers */ = {isa = PBXBuildFile; fileRef = 26377FDDFE7640169154A80AFFC886A3 /* IUAEngine.h */; settings = {ATTRIBUTES = (Public, ); }; };
-		209C2C615ADA7D586FE93781B372B04A /* IUAPerfSampler.m in Sources */ = {isa = PBXBuildFile; fileRef = 458929045A524FBD59697C579E865471 /* IUAPerfSampler.m */; };
-		2231CBE765D95DC5166924BACE833ED0 /* IUIAUTO-umbrella.h in Headers */ = {isa = PBXBuildFile; fileRef = B87A6F0BAD64EAA803D112B7D0E788E4 /* IUIAUTO-umbrella.h */; settings = {ATTRIBUTES = (Public, ); }; };
-		261D6D61419665CB22C9D42595D8C994 /* IUAScreenshotService_compare.m in Sources */ = {isa = PBXBuildFile; fileRef = 3E4D2B3DBAC6FCA4F8EF0D28C2FEE9AF /* IUAScreenshotService_compare.m */; };
-		28757AF4A117569E834AD252BB6F9F3E /* IUAConfiguration.h in Headers */ = {isa = PBXBuildFile; fileRef = 4B63AA9688E3E49C8C9962F10CA748FF /* IUAConfiguration.h */; settings = {ATTRIBUTES = (Public, ); }; };
-		358B4B88CA8DA56DBDA1F89D79C39DD9 /* IUALogger.m in Sources */ = {isa = PBXBuildFile; fileRef = 3062BCB9669655CB555B233B12C20EDC /* IUALogger.m */; };
-		38073E36F42295877858E34B1B43EBF4 /* IUAElementQuery.h in Headers */ = {isa = PBXBuildFile; fileRef = 1B11FA59F83895A859D7015D8D9A7818 /* IUAElementQuery.h */; settings = {ATTRIBUTES = (Public, ); }; };
-		3A3B29A36491F17E6421CD13D0FAC2C6 /* IUAConfigViewController.h in Headers */ = {isa = PBXBuildFile; fileRef = EA81D31FA9485952C9AA387671136CBE /* IUAConfigViewController.h */; settings = {ATTRIBUTES = (Public, ); }; };
-		3B74A9B5AAA40346F75277231021AEA8 /* IUIAUTO-dummy.m in Sources */ = {isa = PBXBuildFile; fileRef = 1F280EC50D70F477AFA627890699D4ED /* IUIAUTO-dummy.m */; };
-		3DC851A047029E98C0395A018983CBA3 /* IUAWebSocketClient.h in Headers */ = {isa = PBXBuildFile; fileRef = D9777AF30C3B2F8D9F7E8C61CFF02F3B /* IUAWebSocketClient.h */; settings = {ATTRIBUTES = (Public, ); }; };
-		44677E00C5EF0D80B4F9F497CE9BD277 /* IUACommandResult.h in Headers */ = {isa = PBXBuildFile; fileRef = 852B866B29419A59673789A467F9FC58 /* IUACommandResult.h */; settings = {ATTRIBUTES = (Public, ); }; };
-		4A0B71F40A96CEDF3D004A031A0FC768 /* IUACommandDispatcher.h in Headers */ = {isa = PBXBuildFile; fileRef = 01F46F2B2E25B5DD4472C1F9F7078B1E /* IUACommandDispatcher.h */; settings = {ATTRIBUTES = (Public, ); }; };
-		582B69E31DEAB27E1A9799A51050C229 /* IUAViewIntrospector.m in Sources */ = {isa = PBXBuildFile; fileRef = 2E5AAE675EBAC8C03C701487EC9A25B8 /* IUAViewIntrospector.m */; };
-		5921FF543BF2359FA62D93DEC5257F6C /* IUACommandDispatcher.m in Sources */ = {isa = PBXBuildFile; fileRef = D62461B691682AC1CFB88CD54E80FDD8 /* IUACommandDispatcher.m */; };
-		5BAADBB9D410F86290631EA12BCC24C8 /* IUAFloatingStatusBar.m in Sources */ = {isa = PBXBuildFile; fileRef = DA538A97484A34ED64A7FBFA4199D739 /* IUAFloatingStatusBar.m */; };
-		5CF154D83E484C1B8BB9F368DB614E97 /* IUATextSynthesizer.h in Headers */ = {isa = PBXBuildFile; fileRef = 47BEA9CED8337AB046A4EF897D54634B /* IUATextSynthesizer.h */; settings = {ATTRIBUTES = (Public, ); }; };
-		617FD9F39E88358940824959778DBE68 /* IUAScreenshotService.h in Headers */ = {isa = PBXBuildFile; fileRef = 30BC6D1167DFFD1CD19349A728DB5BA1 /* IUAScreenshotService.h */; settings = {ATTRIBUTES = (Public, ); }; };
-		634FA6B851EC743991A6300BA568658A /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 2CB74A84DF62E0DBFFA4715EF79E08A1 /* Foundation.framework */; };
+		0EDD48AB67D2C124E4A554AEE29866D1 /* IUAViewIntrospector.h in Headers */ = {isa = PBXBuildFile; fileRef = DC4C1EDE4318A9941190F68F1E0B2248 /* IUAViewIntrospector.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		12C3A50CD7EFFA00B02B73700576E87C /* IUAConfigViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 7691341C44955ECC543A1467F1082021 /* IUAConfigViewController.m */; };
+		136328D5CDA07DE0DD4B5585ABE3E597 /* IUALogger.m in Sources */ = {isa = PBXBuildFile; fileRef = 26A71FAECFF19DE7C4249E8C5FB0ABDA /* IUALogger.m */; };
+		1ABB45793A3EE748B867D57EC7C485BA /* IUAConfiguration.m in Sources */ = {isa = PBXBuildFile; fileRef = D709DF7F1E685213D554EF6CE6342391 /* IUAConfiguration.m */; };
+		1B5DDAB90B4B61633458611B07263401 /* IUAElementQuery.h in Headers */ = {isa = PBXBuildFile; fileRef = 6822EE51489E0887FA1918642DBEA090 /* IUAElementQuery.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		1D900011F1D6C1E239C0F8BF0CDE63BB /* IUAEngine.m in Sources */ = {isa = PBXBuildFile; fileRef = 45AF6E6A3A1DAD9B05E6542FCF6A9DF1 /* IUAEngine.m */; };
+		304257C08BFF7286DC3870A20EF301AE /* IUARecorder.m in Sources */ = {isa = PBXBuildFile; fileRef = 37AD55B59C656B47ADBFD1D9F90061DA /* IUARecorder.m */; };
+		36B21A98EA2FBD67B1F6B04CA07FC4FE /* IUACommandDispatcher.m in Sources */ = {isa = PBXBuildFile; fileRef = 15723A69E6C835F800517FA7F25F3E4D /* IUACommandDispatcher.m */; };
+		3DD2F8F1936A8F3BB7234496F3FD047C /* IUALogger.h in Headers */ = {isa = PBXBuildFile; fileRef = 90D7BFB192086C9355DE53A40D6C73DF /* IUALogger.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		41D2FD4F13E9EB045A217B4A6F5F3A44 /* IUAFloatingStatusBar.m in Sources */ = {isa = PBXBuildFile; fileRef = 42C05EBA225135B5061107FE1ED7D0CA /* IUAFloatingStatusBar.m */; };
+		440521C2CF5A60C3B74CAC4A0436D86E /* IUAPerfSampler.m in Sources */ = {isa = PBXBuildFile; fileRef = 153AD1E7D742AD265948C67F20BAE715 /* IUAPerfSampler.m */; };
+		464198DB5CCAFF47E0055DE0C488EB9B /* IUATouchSynthesizer.m in Sources */ = {isa = PBXBuildFile; fileRef = BF294186CC14FF1EFCF0FB95A2BED970 /* IUATouchSynthesizer.m */; };
+		46AAD65AEBDBE5E856A39724727EE357 /* IUAConfiguration.h in Headers */ = {isa = PBXBuildFile; fileRef = 38802E2B324C951B6A6DEF55EC76B746 /* IUAConfiguration.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		4793BE698D146BF8AE4A780A8A29AD47 /* IUATouchSynthesizer.h in Headers */ = {isa = PBXBuildFile; fileRef = 05AF814F870044D0470FF2E27198CAA8 /* IUATouchSynthesizer.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		4CC38ECF2D1803B210E3D03244244101 /* IUIAUTOVersion.m in Sources */ = {isa = PBXBuildFile; fileRef = 6D62E21B2227531D7B5CD14361AD45D6 /* IUIAUTOVersion.m */; };
+		618F20D21AC9DF98A34A7288189CB6B4 /* IUAConfigViewController.h in Headers */ = {isa = PBXBuildFile; fileRef = 0569E407F5D4D0D80B1BB96E10E4D63B /* IUAConfigViewController.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		748779EF8E91EB6CDD41B1C812C0B3B1 /* IUACommandResult.h in Headers */ = {isa = PBXBuildFile; fileRef = AE07BC178FF0B5445C8FCAE1C91EEC48 /* IUACommandResult.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		7A06084B2E79B369514FB5343B9C6503 /* IUATextSynthesizer.h in Headers */ = {isa = PBXBuildFile; fileRef = 69258C5D920BFCA2500A5F37DA191244 /* IUATextSynthesizer.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		7B6856D11A420446F6DDBE0D695D6E8D /* IUAElementQuery.m in Sources */ = {isa = PBXBuildFile; fileRef = 3EDAB1007EBDB029EADD57F81DEEF5DE /* IUAElementQuery.m */; };
+		8A85F4C6EE7F18695A7BCEFDBC77FB2F /* IUAWebSocketClient.m in Sources */ = {isa = PBXBuildFile; fileRef = 87A9C14FFE6600310403C1A6D803D9A9 /* IUAWebSocketClient.m */; };
 		8E7A81AA2B4A46A436C2F777425782CE /* Pods-IUIAutoExample-dummy.m in Sources */ = {isa = PBXBuildFile; fileRef = C4F3324589BB28A870344AFFE53017E2 /* Pods-IUIAutoExample-dummy.m */; };
+		8E9E0CE690DD0D348EE46BB952D2708E /* IUACommandDispatcher.h in Headers */ = {isa = PBXBuildFile; fileRef = CA6E770BBA1F107AFC468C380E388F5D /* IUACommandDispatcher.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		91565983DA092BD4B0FB3C51EBD68F44 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 2CB74A84DF62E0DBFFA4715EF79E08A1 /* Foundation.framework */; };
-		94FF45A90A0EBE530BFC3BF5D03009CF /* IUATouchSynthesizer.h in Headers */ = {isa = PBXBuildFile; fileRef = A349A069A9E21B45D7211EEA96119567 /* IUATouchSynthesizer.h */; settings = {ATTRIBUTES = (Public, ); }; };
-		9AEFADFE16052C9140C0DFD4B1059390 /* IUAViewIntrospector.h in Headers */ = {isa = PBXBuildFile; fileRef = 0F372DB2E17DB188B8F0E027573F741D /* IUAViewIntrospector.h */; settings = {ATTRIBUTES = (Public, ); }; };
-		A3877F1223638FCBA382B692A1875868 /* IUACommand.h in Headers */ = {isa = PBXBuildFile; fileRef = BD1A4E4BC1F962797958DB5AB43314D9 /* IUACommand.h */; settings = {ATTRIBUTES = (Public, ); }; };
-		AF32D7E5FDB5020B0394F9BA0EF3C025 /* IUACommand.m in Sources */ = {isa = PBXBuildFile; fileRef = 2B6345A11C873877EDE94BB03E1BB076 /* IUACommand.m */; };
-		C00D14160D049B17D01CFE0D2A5B3990 /* IUAEngine.m in Sources */ = {isa = PBXBuildFile; fileRef = CBE886AE1A3854330DA0796F613D490C /* IUAEngine.m */; };
-		D56E8AEEFCA26EE82F13EACEE9980D00 /* IUATouchSynthesizer.m in Sources */ = {isa = PBXBuildFile; fileRef = 4A9618B7B62717E382C93E52BFA6AD20 /* IUATouchSynthesizer.m */; };
-		D5A0C0A0D79A520BD9C3C8B7098E3A03 /* IUIAUTO.h in Headers */ = {isa = PBXBuildFile; fileRef = 96B64873044FA2201D88B2E55C666574 /* IUIAUTO.h */; settings = {ATTRIBUTES = (Public, ); }; };
-		E3D84B2BBD201BB8700D1D868E55E098 /* IUAFloatingStatusBar.h in Headers */ = {isa = PBXBuildFile; fileRef = BF6CD7767230368ADB395C0F438D96B1 /* IUAFloatingStatusBar.h */; settings = {ATTRIBUTES = (Public, ); }; };
-		FB22FD99EE536525521C3F2B07E8AC15 /* IUAConfiguration.m in Sources */ = {isa = PBXBuildFile; fileRef = F669A771609D524464B6D221968C4F36 /* IUAConfiguration.m */; };
-		FCAED1A61E193E04E309FD64613B58C8 /* IUAScreenshotService.m in Sources */ = {isa = PBXBuildFile; fileRef = BDA83D7AE73968952E58D5E97D08BF7F /* IUAScreenshotService.m */; };
+		9FC5C5D7D1EE478618D809FC3BBC74A9 /* IUIAUTO-umbrella.h in Headers */ = {isa = PBXBuildFile; fileRef = CA345D94AD6881651B40CF4AF375D680 /* IUIAUTO-umbrella.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		A3B44A6BD1292F6E71DFFC0EB7CFE89A /* IUATextSynthesizer.m in Sources */ = {isa = PBXBuildFile; fileRef = 2C5FF616ED1857994F7F644A6D287CA6 /* IUATextSynthesizer.m */; };
+		A71EF852628EFF79D616CD043F08BA04 /* IUAPerfSampler.h in Headers */ = {isa = PBXBuildFile; fileRef = 3E42DAF25B409918DC9EE42F07DB922F /* IUAPerfSampler.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		B69D80C3167C596C40ACDCB9C2C6FE5B /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 2CB74A84DF62E0DBFFA4715EF79E08A1 /* Foundation.framework */; };
+		B8EB52518CB60137C6C900B3353CBF36 /* IUAWebSocketClient.h in Headers */ = {isa = PBXBuildFile; fileRef = 498245220A7C4C27C32FE9DC81610F38 /* IUAWebSocketClient.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		BFA3138490960DCD1A24081D363296D9 /* IUARecorder.h in Headers */ = {isa = PBXBuildFile; fileRef = 17C648A0FFD1664F414E68A462992F01 /* IUARecorder.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		C3EAE6218577DCEA8710AEA9F1129988 /* IUAScreenshotService.h in Headers */ = {isa = PBXBuildFile; fileRef = EF3A641D67480AFFC36F82A90386642C /* IUAScreenshotService.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		C7977C24E4B2A1D54AA5ED0280C96B78 /* IUIAUTO.h in Headers */ = {isa = PBXBuildFile; fileRef = BC33F9872E24D38557D9228B0D8C6DFB /* IUIAUTO.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		D78627F783AD0708ED2800A84F44CD0E /* IUAScreenshotService_compare.m in Sources */ = {isa = PBXBuildFile; fileRef = A62B1D304150E021BCDACEB43FB6228A /* IUAScreenshotService_compare.m */; };
+		E0D51EF658E881E356F2FB114AB29E51 /* IUACommand.m in Sources */ = {isa = PBXBuildFile; fileRef = F0E253DF7A0984E248846A53D5848EA0 /* IUACommand.m */; };
+		EF3595F7F259B4A3ED893D5574E23200 /* IUAScreenshotService.m in Sources */ = {isa = PBXBuildFile; fileRef = 0F094DD670920A6E4895B13AB7D5DCDD /* IUAScreenshotService.m */; };
+		F10585CAD08A50E7D07CBE948096ADFF /* IUAEngine.h in Headers */ = {isa = PBXBuildFile; fileRef = 14B0005561F4FF8A041866B7E8D94A33 /* IUAEngine.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		F439AEC3560E14841FF51BF1549ADDC2 /* IUIAUTO-dummy.m in Sources */ = {isa = PBXBuildFile; fileRef = 7B6CD8AE7A608559B1C69A478D319CBC /* IUIAUTO-dummy.m */; };
+		F5C1B9A0E0D5ACDA4AAECB819BD0AF6D /* IUAViewIntrospector.m in Sources */ = {isa = PBXBuildFile; fileRef = C1F041C1FCFE0869279EE4F4A5485019 /* IUAViewIntrospector.m */; };
+		F7BF1286A9DA83F35397EFA5E04D2D10 /* IUACommandResult.m in Sources */ = {isa = PBXBuildFile; fileRef = 806D635F5ADC7A8BFC33F407A638C2CC /* IUACommandResult.m */; };
+		FC976AC3B97DBD856EF680798CF2D4A3 /* IUAFloatingStatusBar.h in Headers */ = {isa = PBXBuildFile; fileRef = 4DE1EAE8D241F7F8C55E3E115A46E28B /* IUAFloatingStatusBar.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		FCDAA5AC80D196866D48C391203A05F1 /* IUACommand.h in Headers */ = {isa = PBXBuildFile; fileRef = 7669BAEB3DFF5FF3BC903DFC7017A1C3 /* IUACommand.h */; settings = {ATTRIBUTES = (Public, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
-		0507167BDE46BEA152F578B0AD6EB10F /* PBXContainerItemProxy */ = {
+		CCE987EE434448952E817C585341AE74 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = BFDFE7DC352907FC980B868725387E98 /* Project object */;
 			proxyType = 1;
@@ -60,70 +61,71 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		01F46F2B2E25B5DD4472C1F9F7078B1E /* IUACommandDispatcher.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = IUACommandDispatcher.h; sourceTree = "<group>"; };
-		0F372DB2E17DB188B8F0E027573F741D /* IUAViewIntrospector.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = IUAViewIntrospector.h; sourceTree = "<group>"; };
-		1B11FA59F83895A859D7015D8D9A7818 /* IUAElementQuery.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = IUAElementQuery.h; sourceTree = "<group>"; };
-		1F280EC50D70F477AFA627890699D4ED /* IUIAUTO-dummy.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = "IUIAUTO-dummy.m"; sourceTree = "<group>"; };
-		204A2C1A6A0EEE6810271311DE347973 /* IUARecorder.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = IUARecorder.h; sourceTree = "<group>"; };
-		26377FDDFE7640169154A80AFFC886A3 /* IUAEngine.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = IUAEngine.h; sourceTree = "<group>"; };
-		2B6345A11C873877EDE94BB03E1BB076 /* IUACommand.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = IUACommand.m; sourceTree = "<group>"; };
-		2C231F147206AB5A0308B1E6B48081A7 /* README.md */ = {isa = PBXFileReference; includeInIndex = 1; path = README.md; sourceTree = "<group>"; };
+		0569E407F5D4D0D80B1BB96E10E4D63B /* IUAConfigViewController.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = IUAConfigViewController.h; sourceTree = "<group>"; };
+		05AF814F870044D0470FF2E27198CAA8 /* IUATouchSynthesizer.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = IUATouchSynthesizer.h; sourceTree = "<group>"; };
+		061F3765C1FEF601221B919B520F9170 /* IUIAUTO.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; path = IUIAUTO.debug.xcconfig; sourceTree = "<group>"; };
+		0F094DD670920A6E4895B13AB7D5DCDD /* IUAScreenshotService.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = IUAScreenshotService.m; sourceTree = "<group>"; };
+		14B0005561F4FF8A041866B7E8D94A33 /* IUAEngine.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = IUAEngine.h; sourceTree = "<group>"; };
+		1527E8D3786A6150C73CE6F52E1B394D /* IUIAUTO-prefix.pch */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = "IUIAUTO-prefix.pch"; sourceTree = "<group>"; };
+		153AD1E7D742AD265948C67F20BAE715 /* IUAPerfSampler.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = IUAPerfSampler.m; sourceTree = "<group>"; };
+		15723A69E6C835F800517FA7F25F3E4D /* IUACommandDispatcher.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = IUACommandDispatcher.m; sourceTree = "<group>"; };
+		17C648A0FFD1664F414E68A462992F01 /* IUARecorder.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = IUARecorder.h; sourceTree = "<group>"; };
+		196432C2AE0C39D87BDCF2121B4C0422 /* README.md */ = {isa = PBXFileReference; includeInIndex = 1; path = README.md; sourceTree = "<group>"; };
+		26A71FAECFF19DE7C4249E8C5FB0ABDA /* IUALogger.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = IUALogger.m; sourceTree = "<group>"; };
+		2C5FF616ED1857994F7F644A6D287CA6 /* IUATextSynthesizer.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = IUATextSynthesizer.m; sourceTree = "<group>"; };
 		2CB74A84DF62E0DBFFA4715EF79E08A1 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
-		2E5AAE675EBAC8C03C701487EC9A25B8 /* IUAViewIntrospector.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = IUAViewIntrospector.m; sourceTree = "<group>"; };
-		3062BCB9669655CB555B233B12C20EDC /* IUALogger.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = IUALogger.m; sourceTree = "<group>"; };
-		30BC6D1167DFFD1CD19349A728DB5BA1 /* IUAScreenshotService.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = IUAScreenshotService.h; sourceTree = "<group>"; };
 		32CBAC79869E28C01DD3D49B7AAF9F75 /* Pods-IUIAutoExample-acknowledgements.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = "Pods-IUIAutoExample-acknowledgements.plist"; sourceTree = "<group>"; };
-		3E4D2B3DBAC6FCA4F8EF0D28C2FEE9AF /* IUAScreenshotService_compare.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = IUAScreenshotService_compare.m; sourceTree = "<group>"; };
-		42E47BD040985500DEE198EB9FD2765F /* IUIAUTO.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; path = IUIAUTO.debug.xcconfig; sourceTree = "<group>"; };
-		458929045A524FBD59697C579E865471 /* IUAPerfSampler.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = IUAPerfSampler.m; sourceTree = "<group>"; };
-		47BC971B06E5986721A2805AA3B8606E /* IUIAUTO.podspec */ = {isa = PBXFileReference; explicitFileType = text.script.ruby; includeInIndex = 1; indentWidth = 2; lastKnownFileType = text; path = IUIAUTO.podspec; sourceTree = "<group>"; tabWidth = 2; xcLanguageSpecificationIdentifier = xcode.lang.ruby; };
-		47BEA9CED8337AB046A4EF897D54634B /* IUATextSynthesizer.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = IUATextSynthesizer.h; sourceTree = "<group>"; };
-		4A9618B7B62717E382C93E52BFA6AD20 /* IUATouchSynthesizer.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = IUATouchSynthesizer.m; sourceTree = "<group>"; };
-		4B63AA9688E3E49C8C9962F10CA748FF /* IUAConfiguration.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = IUAConfiguration.h; sourceTree = "<group>"; };
+		37AD55B59C656B47ADBFD1D9F90061DA /* IUARecorder.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = IUARecorder.m; sourceTree = "<group>"; };
+		38802E2B324C951B6A6DEF55EC76B746 /* IUAConfiguration.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = IUAConfiguration.h; sourceTree = "<group>"; };
+		3E42DAF25B409918DC9EE42F07DB922F /* IUAPerfSampler.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = IUAPerfSampler.h; sourceTree = "<group>"; };
+		3EDAB1007EBDB029EADD57F81DEEF5DE /* IUAElementQuery.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = IUAElementQuery.m; sourceTree = "<group>"; };
+		42C05EBA225135B5061107FE1ED7D0CA /* IUAFloatingStatusBar.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = IUAFloatingStatusBar.m; sourceTree = "<group>"; };
+		45AF6E6A3A1DAD9B05E6542FCF6A9DF1 /* IUAEngine.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = IUAEngine.m; sourceTree = "<group>"; };
+		498245220A7C4C27C32FE9DC81610F38 /* IUAWebSocketClient.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = IUAWebSocketClient.h; sourceTree = "<group>"; };
 		4BB50F1C1C42CECF073080E296504858 /* Pods-IUIAutoExample-acknowledgements.markdown */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text; path = "Pods-IUIAutoExample-acknowledgements.markdown"; sourceTree = "<group>"; };
+		4DE1EAE8D241F7F8C55E3E115A46E28B /* IUAFloatingStatusBar.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = IUAFloatingStatusBar.h; sourceTree = "<group>"; };
+		55AABE9DD300FCC5F60A8442B78C5808 /* IUIAUTO.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; path = IUIAUTO.release.xcconfig; sourceTree = "<group>"; };
 		5D0215A75912282D173BF5144E2DB22F /* IUIAUTO */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; name = IUIAUTO; path = IUIAUTO.framework; sourceTree = BUILT_PRODUCTS_DIR; };
-		60B05DDC09DCB7D2A37D2CD85B183D61 /* IUATextSynthesizer.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = IUATextSynthesizer.m; sourceTree = "<group>"; };
 		6636AA8E2DF6C670588703F217BDEB8A /* Pods-IUIAutoExample-umbrella.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = "Pods-IUIAutoExample-umbrella.h"; sourceTree = "<group>"; };
+		6822EE51489E0887FA1918642DBEA090 /* IUAElementQuery.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = IUAElementQuery.h; sourceTree = "<group>"; };
+		69258C5D920BFCA2500A5F37DA191244 /* IUATextSynthesizer.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = IUATextSynthesizer.h; sourceTree = "<group>"; };
+		692CCF7866A6F60781165AB2C2839B7F /* IUIAUTO.modulemap */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.module; path = IUIAUTO.modulemap; sourceTree = "<group>"; };
+		6D62E21B2227531D7B5CD14361AD45D6 /* IUIAUTOVersion.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; name = IUIAUTOVersion.m; path = Sources/IUIAUTOVersion.m; sourceTree = "<group>"; };
+		7669BAEB3DFF5FF3BC903DFC7017A1C3 /* IUACommand.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = IUACommand.h; sourceTree = "<group>"; };
+		7691341C44955ECC543A1467F1082021 /* IUAConfigViewController.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = IUAConfigViewController.m; sourceTree = "<group>"; };
 		7B2F33D648DAEC2584828BCC762DE925 /* Pods-IUIAutoExample-Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = "Pods-IUIAutoExample-Info.plist"; sourceTree = "<group>"; };
-		83D8EAB35984F73A31990684601DBB0D /* IUAElementQuery.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = IUAElementQuery.m; sourceTree = "<group>"; };
-		852B866B29419A59673789A467F9FC58 /* IUACommandResult.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = IUACommandResult.h; sourceTree = "<group>"; };
-		8C2D8B23F94F6C1A455F1B6938AD54B9 /* IUAWebSocketClient.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = IUAWebSocketClient.m; sourceTree = "<group>"; };
-		960056A2F8EDB1B67DBC3033BA590C18 /* LICENSE */ = {isa = PBXFileReference; includeInIndex = 1; path = LICENSE; sourceTree = "<group>"; };
-		96B64873044FA2201D88B2E55C666574 /* IUIAUTO.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; name = IUIAUTO.h; path = Sources/IUIAUTO.h; sourceTree = "<group>"; };
+		7B6CD8AE7A608559B1C69A478D319CBC /* IUIAUTO-dummy.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = "IUIAUTO-dummy.m"; sourceTree = "<group>"; };
+		806D635F5ADC7A8BFC33F407A638C2CC /* IUACommandResult.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = IUACommandResult.m; sourceTree = "<group>"; };
+		87A9C14FFE6600310403C1A6D803D9A9 /* IUAWebSocketClient.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = IUAWebSocketClient.m; sourceTree = "<group>"; };
+		90D7BFB192086C9355DE53A40D6C73DF /* IUALogger.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = IUALogger.h; sourceTree = "<group>"; };
 		97B2DB578FBE0AD6C8B8E4CC2395E176 /* Pods-IUIAutoExample.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; path = "Pods-IUIAutoExample.debug.xcconfig"; sourceTree = "<group>"; };
 		9D940727FF8FB9C785EB98E56350EF41 /* Podfile */ = {isa = PBXFileReference; explicitFileType = text.script.ruby; includeInIndex = 1; indentWidth = 2; lastKnownFileType = text; name = Podfile; path = ../Podfile; sourceTree = SOURCE_ROOT; tabWidth = 2; xcLanguageSpecificationIdentifier = xcode.lang.ruby; };
 		9E3320644780F6F6527C8AAD9FB29848 /* Pods-IUIAutoExample */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; name = "Pods-IUIAutoExample"; path = Pods_IUIAutoExample.framework; sourceTree = BUILT_PRODUCTS_DIR; };
-		A349A069A9E21B45D7211EEA96119567 /* IUATouchSynthesizer.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = IUATouchSynthesizer.h; sourceTree = "<group>"; };
-		ACFCE8B2A0F6DBC5A694B294CC38DC79 /* IUIAUTO.modulemap */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.module; path = IUIAUTO.modulemap; sourceTree = "<group>"; };
-		B7560C101EA4892B71EB7CDED281263F /* IUIAUTO.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; path = IUIAUTO.release.xcconfig; sourceTree = "<group>"; };
-		B87A6F0BAD64EAA803D112B7D0E788E4 /* IUIAUTO-umbrella.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = "IUIAUTO-umbrella.h"; sourceTree = "<group>"; };
-		BD1A4E4BC1F962797958DB5AB43314D9 /* IUACommand.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = IUACommand.h; sourceTree = "<group>"; };
-		BDA83D7AE73968952E58D5E97D08BF7F /* IUAScreenshotService.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = IUAScreenshotService.m; sourceTree = "<group>"; };
-		BF6CD7767230368ADB395C0F438D96B1 /* IUAFloatingStatusBar.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = IUAFloatingStatusBar.h; sourceTree = "<group>"; };
+		A62B1D304150E021BCDACEB43FB6228A /* IUAScreenshotService_compare.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = IUAScreenshotService_compare.m; sourceTree = "<group>"; };
+		AE07BC178FF0B5445C8FCAE1C91EEC48 /* IUACommandResult.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = IUACommandResult.h; sourceTree = "<group>"; };
+		B0A6157D5625FA1D9682FB3F2475F4B3 /* LICENSE */ = {isa = PBXFileReference; includeInIndex = 1; path = LICENSE; sourceTree = "<group>"; };
+		BC33F9872E24D38557D9228B0D8C6DFB /* IUIAUTO.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; name = IUIAUTO.h; path = Sources/IUIAUTO.h; sourceTree = "<group>"; };
+		BF294186CC14FF1EFCF0FB95A2BED970 /* IUATouchSynthesizer.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = IUATouchSynthesizer.m; sourceTree = "<group>"; };
+		C1F041C1FCFE0869279EE4F4A5485019 /* IUAViewIntrospector.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = IUAViewIntrospector.m; sourceTree = "<group>"; };
 		C4F3324589BB28A870344AFFE53017E2 /* Pods-IUIAutoExample-dummy.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = "Pods-IUIAutoExample-dummy.m"; sourceTree = "<group>"; };
+		C60B33CBF6C9A07AAFFB1A9858E178C0 /* IUIAUTO.podspec */ = {isa = PBXFileReference; explicitFileType = text.script.ruby; includeInIndex = 1; indentWidth = 2; lastKnownFileType = text; path = IUIAUTO.podspec; sourceTree = "<group>"; tabWidth = 2; xcLanguageSpecificationIdentifier = xcode.lang.ruby; };
 		C8C39765CF81BC10DE5F1D1C7AE524F1 /* Pods-IUIAutoExample.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; path = "Pods-IUIAutoExample.release.xcconfig"; sourceTree = "<group>"; };
-		CABEABC1225F756BC17619FC513B0F3A /* IUARecorder.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = IUARecorder.m; sourceTree = "<group>"; };
-		CBE886AE1A3854330DA0796F613D490C /* IUAEngine.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = IUAEngine.m; sourceTree = "<group>"; };
-		D62461B691682AC1CFB88CD54E80FDD8 /* IUACommandDispatcher.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = IUACommandDispatcher.m; sourceTree = "<group>"; };
-		D8A9D3FEC1FCE586B1814102E6BE247B /* IUAConfigViewController.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = IUAConfigViewController.m; sourceTree = "<group>"; };
-		D9777AF30C3B2F8D9F7E8C61CFF02F3B /* IUAWebSocketClient.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = IUAWebSocketClient.h; sourceTree = "<group>"; };
-		D9D2578518CB197FB3BE20EEFB5AE208 /* IUACommandResult.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = IUACommandResult.m; sourceTree = "<group>"; };
-		DA538A97484A34ED64A7FBFA4199D739 /* IUAFloatingStatusBar.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = IUAFloatingStatusBar.m; sourceTree = "<group>"; };
-		DB3B53AAE2F6A81EEAB2C36E4064EAB2 /* IUIAUTO-Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = "IUIAUTO-Info.plist"; sourceTree = "<group>"; };
-		E076D80E167137D7EE5233A24E6A2DA2 /* IUIAUTO-prefix.pch */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = "IUIAUTO-prefix.pch"; sourceTree = "<group>"; };
-		EA81D31FA9485952C9AA387671136CBE /* IUAConfigViewController.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = IUAConfigViewController.h; sourceTree = "<group>"; };
-		F669A771609D524464B6D221968C4F36 /* IUAConfiguration.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = IUAConfiguration.m; sourceTree = "<group>"; };
+		CA345D94AD6881651B40CF4AF375D680 /* IUIAUTO-umbrella.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = "IUIAUTO-umbrella.h"; sourceTree = "<group>"; };
+		CA6E770BBA1F107AFC468C380E388F5D /* IUACommandDispatcher.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = IUACommandDispatcher.h; sourceTree = "<group>"; };
+		D709DF7F1E685213D554EF6CE6342391 /* IUAConfiguration.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = IUAConfiguration.m; sourceTree = "<group>"; };
+		DC4C1EDE4318A9941190F68F1E0B2248 /* IUAViewIntrospector.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = IUAViewIntrospector.h; sourceTree = "<group>"; };
+		E08955818F1E2E5ABB1E087FDE857CE1 /* IUIAUTO-Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = "IUIAUTO-Info.plist"; sourceTree = "<group>"; };
+		EF3A641D67480AFFC36F82A90386642C /* IUAScreenshotService.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = IUAScreenshotService.h; sourceTree = "<group>"; };
+		F0E253DF7A0984E248846A53D5848EA0 /* IUACommand.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = IUACommand.m; sourceTree = "<group>"; };
 		F9699F5299BBA4833A27C3872FFBC7FE /* Pods-IUIAutoExample.modulemap */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.module; path = "Pods-IUIAutoExample.modulemap"; sourceTree = "<group>"; };
-		F9A5D16B6A8892BABB5F7A891A2350F0 /* IUALogger.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = IUALogger.h; sourceTree = "<group>"; };
-		FCAFA2A4C47A5BF9784605E89F1079EC /* IUAPerfSampler.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = IUAPerfSampler.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
-		6F0FA1E6389192300AE495D747A37B4C /* Frameworks */ = {
+		888BD3409BC7440BAEE388A08B9DF5E6 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				634FA6B851EC743991A6300BA568658A /* Foundation.framework in Frameworks */,
+				B69D80C3167C596C40ACDCB9C2C6FE5B /* Foundation.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -138,16 +140,6 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		0030271F01D304A30FAFFABDE4869A49 /* Pod */ = {
-			isa = PBXGroup;
-			children = (
-				47BC971B06E5986721A2805AA3B8606E /* IUIAUTO.podspec */,
-				960056A2F8EDB1B67DBC3033BA590C18 /* LICENSE */,
-				2C231F147206AB5A0308B1E6B48081A7 /* README.md */,
-			);
-			name = Pod;
-			sourceTree = "<group>";
-		};
 		0623D8ED301225DE1B74BD28C148205E /* Products */ = {
 			isa = PBXGroup;
 			children = (
@@ -157,12 +149,42 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
-		32FDCCA1BDE7914EAC92433B27C2DD57 /* Development Pods */ = {
+		1BF9AB81DFF46BE5DE1C23436C2F5411 /* Actions */ = {
 			isa = PBXGroup;
 			children = (
-				FEF4C84A78F345811C8C244B134C10C6 /* IUIAUTO */,
+				6822EE51489E0887FA1918642DBEA090 /* IUAElementQuery.h */,
+				3EDAB1007EBDB029EADD57F81DEEF5DE /* IUAElementQuery.m */,
+				3E42DAF25B409918DC9EE42F07DB922F /* IUAPerfSampler.h */,
+				153AD1E7D742AD265948C67F20BAE715 /* IUAPerfSampler.m */,
+				17C648A0FFD1664F414E68A462992F01 /* IUARecorder.h */,
+				37AD55B59C656B47ADBFD1D9F90061DA /* IUARecorder.m */,
+				EF3A641D67480AFFC36F82A90386642C /* IUAScreenshotService.h */,
+				0F094DD670920A6E4895B13AB7D5DCDD /* IUAScreenshotService.m */,
+				A62B1D304150E021BCDACEB43FB6228A /* IUAScreenshotService_compare.m */,
+				69258C5D920BFCA2500A5F37DA191244 /* IUATextSynthesizer.h */,
+				2C5FF616ED1857994F7F644A6D287CA6 /* IUATextSynthesizer.m */,
+				05AF814F870044D0470FF2E27198CAA8 /* IUATouchSynthesizer.h */,
+				BF294186CC14FF1EFCF0FB95A2BED970 /* IUATouchSynthesizer.m */,
+				DC4C1EDE4318A9941190F68F1E0B2248 /* IUAViewIntrospector.h */,
+				C1F041C1FCFE0869279EE4F4A5485019 /* IUAViewIntrospector.m */,
 			);
-			name = "Development Pods";
+			name = Actions;
+			path = Sources/Actions;
+			sourceTree = "<group>";
+		};
+		369786D468313217338180005F7A34B9 /* IUIAUTO */ = {
+			isa = PBXGroup;
+			children = (
+				BC33F9872E24D38557D9228B0D8C6DFB /* IUIAUTO.h */,
+				6D62E21B2227531D7B5CD14361AD45D6 /* IUIAUTOVersion.m */,
+				1BF9AB81DFF46BE5DE1C23436C2F5411 /* Actions */,
+				7B745BEC1F9078CA615B342173E5E03B /* Core */,
+				CD99D9112D9142F71869DF2CBBB39037 /* Pod */,
+				D8E7301272A44325629F553035A215A7 /* Support Files */,
+				EC97DB916D3AAA1A1D25A399BC5E215C /* UI */,
+			);
+			name = IUIAUTO;
+			path = ../..;
 			sourceTree = "<group>";
 		};
 		7AECBA61365544F357B06DE1C8710425 /* iOS */ = {
@@ -173,27 +195,26 @@
 			name = iOS;
 			sourceTree = "<group>";
 		};
-		82A076319876C90ADFB20233F38121BC /* Actions */ = {
+		7B745BEC1F9078CA615B342173E5E03B /* Core */ = {
 			isa = PBXGroup;
 			children = (
-				1B11FA59F83895A859D7015D8D9A7818 /* IUAElementQuery.h */,
-				83D8EAB35984F73A31990684601DBB0D /* IUAElementQuery.m */,
-				FCAFA2A4C47A5BF9784605E89F1079EC /* IUAPerfSampler.h */,
-				458929045A524FBD59697C579E865471 /* IUAPerfSampler.m */,
-				204A2C1A6A0EEE6810271311DE347973 /* IUARecorder.h */,
-				CABEABC1225F756BC17619FC513B0F3A /* IUARecorder.m */,
-				30BC6D1167DFFD1CD19349A728DB5BA1 /* IUAScreenshotService.h */,
-				BDA83D7AE73968952E58D5E97D08BF7F /* IUAScreenshotService.m */,
-				3E4D2B3DBAC6FCA4F8EF0D28C2FEE9AF /* IUAScreenshotService_compare.m */,
-				47BEA9CED8337AB046A4EF897D54634B /* IUATextSynthesizer.h */,
-				60B05DDC09DCB7D2A37D2CD85B183D61 /* IUATextSynthesizer.m */,
-				A349A069A9E21B45D7211EEA96119567 /* IUATouchSynthesizer.h */,
-				4A9618B7B62717E382C93E52BFA6AD20 /* IUATouchSynthesizer.m */,
-				0F372DB2E17DB188B8F0E027573F741D /* IUAViewIntrospector.h */,
-				2E5AAE675EBAC8C03C701487EC9A25B8 /* IUAViewIntrospector.m */,
+				7669BAEB3DFF5FF3BC903DFC7017A1C3 /* IUACommand.h */,
+				F0E253DF7A0984E248846A53D5848EA0 /* IUACommand.m */,
+				CA6E770BBA1F107AFC468C380E388F5D /* IUACommandDispatcher.h */,
+				15723A69E6C835F800517FA7F25F3E4D /* IUACommandDispatcher.m */,
+				AE07BC178FF0B5445C8FCAE1C91EEC48 /* IUACommandResult.h */,
+				806D635F5ADC7A8BFC33F407A638C2CC /* IUACommandResult.m */,
+				38802E2B324C951B6A6DEF55EC76B746 /* IUAConfiguration.h */,
+				D709DF7F1E685213D554EF6CE6342391 /* IUAConfiguration.m */,
+				14B0005561F4FF8A041866B7E8D94A33 /* IUAEngine.h */,
+				45AF6E6A3A1DAD9B05E6542FCF6A9DF1 /* IUAEngine.m */,
+				90D7BFB192086C9355DE53A40D6C73DF /* IUALogger.h */,
+				26A71FAECFF19DE7C4249E8C5FB0ABDA /* IUALogger.m */,
+				498245220A7C4C27C32FE9DC81610F38 /* IUAWebSocketClient.h */,
+				87A9C14FFE6600310403C1A6D803D9A9 /* IUAWebSocketClient.m */,
 			);
-			name = Actions;
-			path = Sources/Actions;
+			name = Core;
+			path = Sources/Core;
 			sourceTree = "<group>";
 		};
 		8C3B94D73C384D6B779A4923754FA10F /* Pods-IUIAutoExample */ = {
@@ -220,33 +241,21 @@
 			name = "Targets Support Files";
 			sourceTree = "<group>";
 		};
-		AE74CC0637BBF36B10121CE5E02DA205 /* Core */ = {
+		CD99D9112D9142F71869DF2CBBB39037 /* Pod */ = {
 			isa = PBXGroup;
 			children = (
-				BD1A4E4BC1F962797958DB5AB43314D9 /* IUACommand.h */,
-				2B6345A11C873877EDE94BB03E1BB076 /* IUACommand.m */,
-				01F46F2B2E25B5DD4472C1F9F7078B1E /* IUACommandDispatcher.h */,
-				D62461B691682AC1CFB88CD54E80FDD8 /* IUACommandDispatcher.m */,
-				852B866B29419A59673789A467F9FC58 /* IUACommandResult.h */,
-				D9D2578518CB197FB3BE20EEFB5AE208 /* IUACommandResult.m */,
-				4B63AA9688E3E49C8C9962F10CA748FF /* IUAConfiguration.h */,
-				F669A771609D524464B6D221968C4F36 /* IUAConfiguration.m */,
-				26377FDDFE7640169154A80AFFC886A3 /* IUAEngine.h */,
-				CBE886AE1A3854330DA0796F613D490C /* IUAEngine.m */,
-				F9A5D16B6A8892BABB5F7A891A2350F0 /* IUALogger.h */,
-				3062BCB9669655CB555B233B12C20EDC /* IUALogger.m */,
-				D9777AF30C3B2F8D9F7E8C61CFF02F3B /* IUAWebSocketClient.h */,
-				8C2D8B23F94F6C1A455F1B6938AD54B9 /* IUAWebSocketClient.m */,
+				C60B33CBF6C9A07AAFFB1A9858E178C0 /* IUIAUTO.podspec */,
+				B0A6157D5625FA1D9682FB3F2475F4B3 /* LICENSE */,
+				196432C2AE0C39D87BDCF2121B4C0422 /* README.md */,
 			);
-			name = Core;
-			path = Sources/Core;
+			name = Pod;
 			sourceTree = "<group>";
 		};
 		CF1408CF629C7361332E53B88F7BD30C = {
 			isa = PBXGroup;
 			children = (
 				9D940727FF8FB9C785EB98E56350EF41 /* Podfile */,
-				32FDCCA1BDE7914EAC92433B27C2DD57 /* Development Pods */,
+				F85ED9BF2CD67E95AC9660A2B51FA155 /* Development Pods */,
 				D210D550F4EA176C3123ED886F8F87F5 /* Frameworks */,
 				0623D8ED301225DE1B74BD28C148205E /* Products */,
 				96C02EEA2E56A11D6C91C9E2CAE78506 /* Targets Support Files */,
@@ -261,45 +270,39 @@
 			name = Frameworks;
 			sourceTree = "<group>";
 		};
-		DC1555D4F34EFEA06978ADAEA5D97A5B /* UI */ = {
+		D8E7301272A44325629F553035A215A7 /* Support Files */ = {
 			isa = PBXGroup;
 			children = (
-				EA81D31FA9485952C9AA387671136CBE /* IUAConfigViewController.h */,
-				D8A9D3FEC1FCE586B1814102E6BE247B /* IUAConfigViewController.m */,
-				BF6CD7767230368ADB395C0F438D96B1 /* IUAFloatingStatusBar.h */,
-				DA538A97484A34ED64A7FBFA4199D739 /* IUAFloatingStatusBar.m */,
-			);
-			name = UI;
-			path = Sources/UI;
-			sourceTree = "<group>";
-		};
-		E773B14FFBE55B316E269991208EC6EF /* Support Files */ = {
-			isa = PBXGroup;
-			children = (
-				ACFCE8B2A0F6DBC5A694B294CC38DC79 /* IUIAUTO.modulemap */,
-				1F280EC50D70F477AFA627890699D4ED /* IUIAUTO-dummy.m */,
-				DB3B53AAE2F6A81EEAB2C36E4064EAB2 /* IUIAUTO-Info.plist */,
-				E076D80E167137D7EE5233A24E6A2DA2 /* IUIAUTO-prefix.pch */,
-				B87A6F0BAD64EAA803D112B7D0E788E4 /* IUIAUTO-umbrella.h */,
-				42E47BD040985500DEE198EB9FD2765F /* IUIAUTO.debug.xcconfig */,
-				B7560C101EA4892B71EB7CDED281263F /* IUIAUTO.release.xcconfig */,
+				692CCF7866A6F60781165AB2C2839B7F /* IUIAUTO.modulemap */,
+				7B6CD8AE7A608559B1C69A478D319CBC /* IUIAUTO-dummy.m */,
+				E08955818F1E2E5ABB1E087FDE857CE1 /* IUIAUTO-Info.plist */,
+				1527E8D3786A6150C73CE6F52E1B394D /* IUIAUTO-prefix.pch */,
+				CA345D94AD6881651B40CF4AF375D680 /* IUIAUTO-umbrella.h */,
+				061F3765C1FEF601221B919B520F9170 /* IUIAUTO.debug.xcconfig */,
+				55AABE9DD300FCC5F60A8442B78C5808 /* IUIAUTO.release.xcconfig */,
 			);
 			name = "Support Files";
 			path = "Example/Pods/Target Support Files/IUIAUTO";
 			sourceTree = "<group>";
 		};
-		FEF4C84A78F345811C8C244B134C10C6 /* IUIAUTO */ = {
+		EC97DB916D3AAA1A1D25A399BC5E215C /* UI */ = {
 			isa = PBXGroup;
 			children = (
-				96B64873044FA2201D88B2E55C666574 /* IUIAUTO.h */,
-				82A076319876C90ADFB20233F38121BC /* Actions */,
-				AE74CC0637BBF36B10121CE5E02DA205 /* Core */,
-				0030271F01D304A30FAFFABDE4869A49 /* Pod */,
-				E773B14FFBE55B316E269991208EC6EF /* Support Files */,
-				DC1555D4F34EFEA06978ADAEA5D97A5B /* UI */,
+				0569E407F5D4D0D80B1BB96E10E4D63B /* IUAConfigViewController.h */,
+				7691341C44955ECC543A1467F1082021 /* IUAConfigViewController.m */,
+				4DE1EAE8D241F7F8C55E3E115A46E28B /* IUAFloatingStatusBar.h */,
+				42C05EBA225135B5061107FE1ED7D0CA /* IUAFloatingStatusBar.m */,
 			);
-			name = IUIAUTO;
-			path = ../..;
+			name = UI;
+			path = Sources/UI;
+			sourceTree = "<group>";
+		};
+		F85ED9BF2CD67E95AC9660A2B51FA155 /* Development Pods */ = {
+			isa = PBXGroup;
+			children = (
+				369786D468313217338180005F7A34B9 /* IUIAUTO */,
+			);
+			name = "Development Pods";
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -313,28 +316,28 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		AC231E23CDB5EEA6AF3BDBFB57A8A07F /* Headers */ = {
+		EA55E4CD2A56A0116234EC1E77825798 /* Headers */ = {
 			isa = PBXHeadersBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				A3877F1223638FCBA382B692A1875868 /* IUACommand.h in Headers */,
-				4A0B71F40A96CEDF3D004A031A0FC768 /* IUACommandDispatcher.h in Headers */,
-				44677E00C5EF0D80B4F9F497CE9BD277 /* IUACommandResult.h in Headers */,
-				28757AF4A117569E834AD252BB6F9F3E /* IUAConfiguration.h in Headers */,
-				3A3B29A36491F17E6421CD13D0FAC2C6 /* IUAConfigViewController.h in Headers */,
-				38073E36F42295877858E34B1B43EBF4 /* IUAElementQuery.h in Headers */,
-				20853A441594D2FFE75F4817A69FFA66 /* IUAEngine.h in Headers */,
-				E3D84B2BBD201BB8700D1D868E55E098 /* IUAFloatingStatusBar.h in Headers */,
-				004B2B8AE6A4E3EB8FF155F7C6DD3DD6 /* IUALogger.h in Headers */,
-				195E655D60404D6786F6C38665A31BED /* IUAPerfSampler.h in Headers */,
-				1AD9EEA7135C91C8BE39F4F92EF51A68 /* IUARecorder.h in Headers */,
-				617FD9F39E88358940824959778DBE68 /* IUAScreenshotService.h in Headers */,
-				5CF154D83E484C1B8BB9F368DB614E97 /* IUATextSynthesizer.h in Headers */,
-				94FF45A90A0EBE530BFC3BF5D03009CF /* IUATouchSynthesizer.h in Headers */,
-				9AEFADFE16052C9140C0DFD4B1059390 /* IUAViewIntrospector.h in Headers */,
-				3DC851A047029E98C0395A018983CBA3 /* IUAWebSocketClient.h in Headers */,
-				D5A0C0A0D79A520BD9C3C8B7098E3A03 /* IUIAUTO.h in Headers */,
-				2231CBE765D95DC5166924BACE833ED0 /* IUIAUTO-umbrella.h in Headers */,
+				FCDAA5AC80D196866D48C391203A05F1 /* IUACommand.h in Headers */,
+				8E9E0CE690DD0D348EE46BB952D2708E /* IUACommandDispatcher.h in Headers */,
+				748779EF8E91EB6CDD41B1C812C0B3B1 /* IUACommandResult.h in Headers */,
+				46AAD65AEBDBE5E856A39724727EE357 /* IUAConfiguration.h in Headers */,
+				618F20D21AC9DF98A34A7288189CB6B4 /* IUAConfigViewController.h in Headers */,
+				1B5DDAB90B4B61633458611B07263401 /* IUAElementQuery.h in Headers */,
+				F10585CAD08A50E7D07CBE948096ADFF /* IUAEngine.h in Headers */,
+				FC976AC3B97DBD856EF680798CF2D4A3 /* IUAFloatingStatusBar.h in Headers */,
+				3DD2F8F1936A8F3BB7234496F3FD047C /* IUALogger.h in Headers */,
+				A71EF852628EFF79D616CD043F08BA04 /* IUAPerfSampler.h in Headers */,
+				BFA3138490960DCD1A24081D363296D9 /* IUARecorder.h in Headers */,
+				C3EAE6218577DCEA8710AEA9F1129988 /* IUAScreenshotService.h in Headers */,
+				7A06084B2E79B369514FB5343B9C6503 /* IUATextSynthesizer.h in Headers */,
+				4793BE698D146BF8AE4A780A8A29AD47 /* IUATouchSynthesizer.h in Headers */,
+				0EDD48AB67D2C124E4A554AEE29866D1 /* IUAViewIntrospector.h in Headers */,
+				B8EB52518CB60137C6C900B3353CBF36 /* IUAWebSocketClient.h in Headers */,
+				C7977C24E4B2A1D54AA5ED0280C96B78 /* IUIAUTO.h in Headers */,
+				9FC5C5D7D1EE478618D809FC3BBC74A9 /* IUIAUTO-umbrella.h in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -353,7 +356,7 @@
 			buildRules = (
 			);
 			dependencies = (
-				866B51C054DCD7BDEA80212AA1D871CB /* PBXTargetDependency */,
+				172F9D4EDC7BE132C3EA04312006712E /* PBXTargetDependency */,
 			);
 			name = "Pods-IUIAutoExample";
 			productName = Pods_IUIAutoExample;
@@ -362,12 +365,12 @@
 		};
 		DFB15DA8A85E8F54AF03940D8159621F /* IUIAUTO */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 3EBF4BD86C5AC388F9E584F269115B3B /* Build configuration list for PBXNativeTarget "IUIAUTO" */;
+			buildConfigurationList = B69BB67264F8F56AEE80DA229A097812 /* Build configuration list for PBXNativeTarget "IUIAUTO" */;
 			buildPhases = (
-				AC231E23CDB5EEA6AF3BDBFB57A8A07F /* Headers */,
-				005168752DA966C7222A46FD008F6A09 /* Sources */,
-				6F0FA1E6389192300AE495D747A37B4C /* Frameworks */,
-				0A889DA386D0D6EA2DEB018C8EB43586 /* Resources */,
+				EA55E4CD2A56A0116234EC1E77825798 /* Headers */,
+				1626EC408044F7D8AC341DFB07E4BA5A /* Sources */,
+				888BD3409BC7440BAEE388A08B9DF5E6 /* Frameworks */,
+				9BCA84B9E0114270C1E96E52EFADF7C8 /* Resources */,
 			);
 			buildRules = (
 			);
@@ -409,14 +412,14 @@
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-		0A889DA386D0D6EA2DEB018C8EB43586 /* Resources */ = {
+		8F05650F79348D73AC590545094A171C /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		8F05650F79348D73AC590545094A171C /* Resources */ = {
+		9BCA84B9E0114270C1E96E52EFADF7C8 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -426,28 +429,29 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-		005168752DA966C7222A46FD008F6A09 /* Sources */ = {
+		1626EC408044F7D8AC341DFB07E4BA5A /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				AF32D7E5FDB5020B0394F9BA0EF3C025 /* IUACommand.m in Sources */,
-				5921FF543BF2359FA62D93DEC5257F6C /* IUACommandDispatcher.m in Sources */,
-				09D99B587BA6561EE32A77FF9B212B3A /* IUACommandResult.m in Sources */,
-				FB22FD99EE536525521C3F2B07E8AC15 /* IUAConfiguration.m in Sources */,
-				0F4C587D43B60BAE26BECC8B1284BC0B /* IUAConfigViewController.m in Sources */,
-				0C97E61B9B23C487C6CC34704174926B /* IUAElementQuery.m in Sources */,
-				C00D14160D049B17D01CFE0D2A5B3990 /* IUAEngine.m in Sources */,
-				5BAADBB9D410F86290631EA12BCC24C8 /* IUAFloatingStatusBar.m in Sources */,
-				358B4B88CA8DA56DBDA1F89D79C39DD9 /* IUALogger.m in Sources */,
-				209C2C615ADA7D586FE93781B372B04A /* IUAPerfSampler.m in Sources */,
-				0C78412300D9B02D6972C4FC96623626 /* IUARecorder.m in Sources */,
-				FCAED1A61E193E04E309FD64613B58C8 /* IUAScreenshotService.m in Sources */,
-				261D6D61419665CB22C9D42595D8C994 /* IUAScreenshotService_compare.m in Sources */,
-				138ADD89F77BC474CBB66E235CB93BC9 /* IUATextSynthesizer.m in Sources */,
-				D56E8AEEFCA26EE82F13EACEE9980D00 /* IUATouchSynthesizer.m in Sources */,
-				582B69E31DEAB27E1A9799A51050C229 /* IUAViewIntrospector.m in Sources */,
-				020FB86912F9399D28CF0D5636821103 /* IUAWebSocketClient.m in Sources */,
-				3B74A9B5AAA40346F75277231021AEA8 /* IUIAUTO-dummy.m in Sources */,
+				E0D51EF658E881E356F2FB114AB29E51 /* IUACommand.m in Sources */,
+				36B21A98EA2FBD67B1F6B04CA07FC4FE /* IUACommandDispatcher.m in Sources */,
+				F7BF1286A9DA83F35397EFA5E04D2D10 /* IUACommandResult.m in Sources */,
+				1ABB45793A3EE748B867D57EC7C485BA /* IUAConfiguration.m in Sources */,
+				12C3A50CD7EFFA00B02B73700576E87C /* IUAConfigViewController.m in Sources */,
+				7B6856D11A420446F6DDBE0D695D6E8D /* IUAElementQuery.m in Sources */,
+				1D900011F1D6C1E239C0F8BF0CDE63BB /* IUAEngine.m in Sources */,
+				41D2FD4F13E9EB045A217B4A6F5F3A44 /* IUAFloatingStatusBar.m in Sources */,
+				136328D5CDA07DE0DD4B5585ABE3E597 /* IUALogger.m in Sources */,
+				440521C2CF5A60C3B74CAC4A0436D86E /* IUAPerfSampler.m in Sources */,
+				304257C08BFF7286DC3870A20EF301AE /* IUARecorder.m in Sources */,
+				EF3595F7F259B4A3ED893D5574E23200 /* IUAScreenshotService.m in Sources */,
+				D78627F783AD0708ED2800A84F44CD0E /* IUAScreenshotService_compare.m in Sources */,
+				A3B44A6BD1292F6E71DFFC0EB7CFE89A /* IUATextSynthesizer.m in Sources */,
+				464198DB5CCAFF47E0055DE0C488EB9B /* IUATouchSynthesizer.m in Sources */,
+				F5C1B9A0E0D5ACDA4AAECB819BD0AF6D /* IUAViewIntrospector.m in Sources */,
+				8A85F4C6EE7F18695A7BCEFDBC77FB2F /* IUAWebSocketClient.m in Sources */,
+				F439AEC3560E14841FF51BF1549ADDC2 /* IUIAUTO-dummy.m in Sources */,
+				4CC38ECF2D1803B210E3D03244244101 /* IUIAUTOVersion.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -462,11 +466,11 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
-		866B51C054DCD7BDEA80212AA1D871CB /* PBXTargetDependency */ = {
+		172F9D4EDC7BE132C3EA04312006712E /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			name = IUIAUTO;
 			target = DFB15DA8A85E8F54AF03940D8159621F /* IUIAUTO */;
-			targetProxy = 0507167BDE46BEA152F578B0AD6EB10F /* PBXContainerItemProxy */;
+			targetProxy = CCE987EE434448952E817C585341AE74 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -678,49 +682,9 @@
 			};
 			name = Release;
 		};
-		9FCDF24185EF50013F87BD97F1E772E4 /* Debug */ = {
+		ABBE71B7FF877571F6F0276AE5684DF4 /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 42E47BD040985500DEE198EB9FD2765F /* IUIAUTO.debug.xcconfig */;
-			buildSettings = {
-				CLANG_ENABLE_OBJC_WEAK = NO;
-				"CODE_SIGN_IDENTITY[sdk=appletvos*]" = "";
-				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "";
-				"CODE_SIGN_IDENTITY[sdk=watchos*]" = "";
-				CURRENT_PROJECT_VERSION = 1;
-				DEFINES_MODULE = YES;
-				DYLIB_COMPATIBILITY_VERSION = 1;
-				DYLIB_CURRENT_VERSION = 1;
-				DYLIB_INSTALL_NAME_BASE = "@rpath";
-				ENABLE_MODULE_VERIFIER = NO;
-				ENABLE_USER_SCRIPT_SANDBOXING = NO;
-				GCC_PREFIX_HEADER = "Target Support Files/IUIAUTO/IUIAUTO-prefix.pch";
-				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = "Target Support Files/IUIAUTO/IUIAUTO-Info.plist";
-				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
-				IPHONEOS_DEPLOYMENT_TARGET = 13.0;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-					"@loader_path/Frameworks",
-				);
-				MACH_O_TYPE = staticlib;
-				MODULEMAP_FILE = "Target Support Files/IUIAUTO/IUIAUTO.modulemap";
-				PRODUCT_MODULE_NAME = IUIAUTO;
-				PRODUCT_NAME = IUIAUTO;
-				SDKROOT = iphoneos;
-				SKIP_INSTALL = YES;
-				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) ";
-				SWIFT_INSTALL_OBJC_HEADER = YES;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-				VERSIONING_SYSTEM = "apple-generic";
-				VERSION_INFO_PREFIX = "";
-			};
-			name = Debug;
-		};
-		FC01F3EF56196F6EF6E0B1D5CEF8CBF3 /* Release */ = {
-			isa = XCBuildConfiguration;
-			baseConfigurationReference = B7560C101EA4892B71EB7CDED281263F /* IUIAUTO.release.xcconfig */;
+			baseConfigurationReference = 55AABE9DD300FCC5F60A8442B78C5808 /* IUIAUTO.release.xcconfig */;
 			buildSettings = {
 				CLANG_ENABLE_OBJC_WEAK = NO;
 				"CODE_SIGN_IDENTITY[sdk=appletvos*]" = "";
@@ -759,18 +723,49 @@
 			};
 			name = Release;
 		};
+		C246099B4EF423CA0C631D2A2373B481 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 061F3765C1FEF601221B919B520F9170 /* IUIAUTO.debug.xcconfig */;
+			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				"CODE_SIGN_IDENTITY[sdk=appletvos*]" = "";
+				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "";
+				"CODE_SIGN_IDENTITY[sdk=watchos*]" = "";
+				CURRENT_PROJECT_VERSION = 1;
+				DEFINES_MODULE = YES;
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				ENABLE_MODULE_VERIFIER = NO;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				GCC_PREFIX_HEADER = "Target Support Files/IUIAUTO/IUIAUTO-prefix.pch";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "Target Support Files/IUIAUTO/IUIAUTO-Info.plist";
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				IPHONEOS_DEPLOYMENT_TARGET = 13.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				MACH_O_TYPE = staticlib;
+				MODULEMAP_FILE = "Target Support Files/IUIAUTO/IUIAUTO.modulemap";
+				PRODUCT_MODULE_NAME = IUIAUTO;
+				PRODUCT_NAME = IUIAUTO;
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) ";
+				SWIFT_INSTALL_OBJC_HEADER = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VERSIONING_SYSTEM = "apple-generic";
+				VERSION_INFO_PREFIX = "";
+			};
+			name = Debug;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		3EBF4BD86C5AC388F9E584F269115B3B /* Build configuration list for PBXNativeTarget "IUIAUTO" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				9FCDF24185EF50013F87BD97F1E772E4 /* Debug */,
-				FC01F3EF56196F6EF6E0B1D5CEF8CBF3 /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
 		4821239608C13582E20E6DA73FD5F1F9 /* Build configuration list for PBXProject "Pods" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
@@ -785,6 +780,15 @@
 			buildConfigurations = (
 				30F1C47AD45698DD7E39CEDB0C34E55A /* Debug */,
 				3AF044C0226F1C168B1E8C825F2D321C /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		B69BB67264F8F56AEE80DA229A097812 /* Build configuration list for PBXNativeTarget "IUIAUTO" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C246099B4EF423CA0C631D2A2373B481 /* Debug */,
+				ABBE71B7FF877571F6F0276AE5684DF4 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

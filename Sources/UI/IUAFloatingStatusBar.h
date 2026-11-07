@@ -34,6 +34,9 @@ NS_ASSUME_NONNULL_BEGIN
 /// 连接状态驱动（由 IUAEngine 自动调用：YES 显示悬浮条 / NO 隐藏）
 - (void)setConnected:(BOOL)connected;
 
+/// 自动化点击悬浮条前强制恢复可见（yieldForInteraction 淡出期间再次点击时使用）
+- (void)revealForAutomation;
+
 @end
 
 NS_ASSUME_NONNULL_END
