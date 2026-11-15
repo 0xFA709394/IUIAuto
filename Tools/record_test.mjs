@@ -95,10 +95,13 @@ async function main() {
   writeFileSync('recorded_demo.txt', dsl);
   console.log('\nrecorded_demo.txt:\n' + dsl);
 
-  // 回放校验脚本：录制 DSL + 断言（录制已把计数点到 2，回放再 +2 → Count: 4）
-  const replay = dsl + '\n断言文本 label.counter 包含 Count: 4\n断言存在 field.input\n';
+  // 回放校验脚本：录制 DSL + 动态计数断言（录制已完成 2 次点击，回放再 +2）
+  const counterInfo = await send('element_info', { identifier: 'label.counter' });
+  const currentCount = parseInt(String(counterInfo.data?.text || '').replace(/\D+/g, ''), 10) || 0;
+  const expectedCount = currentCount + 2;
+  const replay = dsl + `\n断言文本 label.counter 包含 Count: ${expectedCount}\n断言存在 field.input\n`;
   writeFileSync('replay_check.txt', replay);
-  console.log('replay_check.txt 已生成');
+  console.log(`replay_check.txt 已生成（当前 ${currentCount}，回放后预期 ${expectedCount}）`);
 
   const passed = checks.filter(Boolean).length;
   console.log(`\n录制验证: ${passed}/${checks.length} 通过`);

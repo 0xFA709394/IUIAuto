@@ -48,9 +48,18 @@ NS_ASSUME_NONNULL_BEGIN
     intoViewWithIdentifier:(nullable NSString *)identifier
                 completion:(void (^)(NSError * _Nullable error))completion;
 
+/// 向已定位的输入 view 输入文本（Appium 元素级操作使用；view 必须支持 UIKeyInput）。
+- (void)typeText:(NSString *)text
+        intoView:(UIView *)view
+      completion:(void (^)(NSError * _Nullable error))completion;
+
 /// 清空指定输入框。
 - (void)clearTextInViewWithIdentifier:(nullable NSString *)identifier
                            completion:(void (^)(NSError * _Nullable error))completion;
+
+/// 清空已定位的输入 view。
+- (void)clearTextInView:(UIView *)view
+             completion:(void (^)(NSError * _Nullable error))completion;
 
 @end
 

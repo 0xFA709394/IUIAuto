@@ -100,12 +100,18 @@ static UIResponder *IUACurrentFirstResponder(void) {
 
 #pragma mark - 定位输入目标
 
+static UIResponder<UIKeyInput> * _Nullable IUAInputForView(UIView *view, NSError **error) {
+    if ([view isKindOfClass:[UIResponder class]] && [view conformsToProtocol:@protocol(UIKeyInput)]) {
+        return (UIResponder<UIKeyInput> *)view;
+    }
+    if (error) *error = IUAError([NSString stringWithFormat:@"元素不支持文本输入: %@", view]);
+    return nil;
+}
+
 static UIResponder<UIKeyInput> * _Nullable IUALocateInput(NSString * _Nullable identifier, NSError **error) {
     if (identifier.length > 0) {
         UIView *view = [IUAViewIntrospector findViewWithIdentifier:identifier];
-        if ([view isKindOfClass:[UIResponder class]] && [view conformsToProtocol:@protocol(UIKeyInput)]) {
-            return (UIResponder<UIKeyInput> *)view;
-        }
+        if (view) return IUAInputForView(view, error);
         if (error) *error = IUAError([NSString stringWithFormat:@"找不到支持输入的 view: %@", identifier]);
         return nil;
     }
@@ -136,7 +142,29 @@ static UIResponder<UIKeyInput> * _Nullable IUALocateInput(NSString * _Nullable i
         completion(locateError);
         return;
     }
+    [self typeText:text intoInput:input completion:completion];
+}
 
+- (void)typeText:(NSString *)text
+        intoView:(UIView *)view
+      completion:(void (^)(NSError * _Nullable))completion {
+    NSAssert([NSThread isMainThread], @"typeText 必须在主线程");
+    if (text.length == 0) {
+        completion(IUAError(@"text 为空"));
+        return;
+    }
+    NSError *locateError = nil;
+    UIResponder<UIKeyInput> *input = IUAInputForView(view, &locateError);
+    if (!input) {
+        completion(locateError);
+        return;
+    }
+    [self typeText:text intoInput:input completion:completion];
+}
+
+- (void)typeText:(NSString *)text
+       intoInput:(UIResponder<UIKeyInput> *)input
+      completion:(void (^)(NSError * _Nullable))completion {
     NSString *expectedFull = [(IUAReadText(input) ?: @"") stringByAppendingString:text];
 
     // 焦点就绪（重试等待 layout）→ 键盘激活等待 → 插入 → 回读校验 → 兜底
@@ -165,7 +193,7 @@ static UIResponder<UIKeyInput> * _Nullable IUALocateInput(NSString * _Nullable i
             });   // 结束 dispatch_after block
         } else {
             // 焦点拿不到（视图未就绪/只读态等）：不报错，直接直赋兜底
-            IUALogWarn(@"无法获得焦点（%@），使用直赋路径", identifier ?: @"当前焦点");
+            IUALogWarn(@"无法获得焦点（%@），使用直赋路径", NSStringFromClass(input.class));
             if (IUASetTextDirectly(input, expectedFull)) {
                 completion(nil);
             } else {
@@ -185,7 +213,23 @@ static UIResponder<UIKeyInput> * _Nullable IUALocateInput(NSString * _Nullable i
         completion(locateError);
         return;
     }
+    [self clearTextInInput:input completion:completion];
+}
 
+- (void)clearTextInView:(UIView *)view
+             completion:(void (^)(NSError * _Nullable))completion {
+    NSAssert([NSThread isMainThread], @"clearText 必须在主线程");
+    NSError *locateError = nil;
+    UIResponder<UIKeyInput> *input = IUAInputForView(view, &locateError);
+    if (!input) {
+        completion(locateError);
+        return;
+    }
+    [self clearTextInInput:input completion:completion];
+}
+
+- (void)clearTextInInput:(UIResponder<UIKeyInput> *)input
+              completion:(void (^)(NSError * _Nullable))completion {
     NSString *original = IUAReadText(input);
     if (original != nil && original.length == 0) {
         completion(nil);   // 已为空，幂等成功

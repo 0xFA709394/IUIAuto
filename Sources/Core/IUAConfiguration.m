@@ -38,15 +38,31 @@ static NSString *const kDefaultServerURL = @"ws://127.0.0.1:9800/ws";
     return kDefaultServerURL;
 }
 
++ (BOOL)isValidServerURLString:(NSString *)urlString {
+    NSString *trimmed = [urlString stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if (trimmed.length == 0) return NO;
+    NSURLComponents *components = [NSURLComponents componentsWithString:trimmed];
+    if (!components) return NO;
+    NSString *scheme = components.scheme.lowercaseString;
+    if (![scheme isEqualToString:@"ws"] && ![scheme isEqualToString:@"wss"]) return NO;
+    if (components.host.length == 0) return NO;
+    return YES;
+}
+
 + (NSURL *)serverURL {
-    return [NSURL URLWithString:[self serverURLString]];
+    NSString *string = [self serverURLString];
+    if (![self isValidServerURLString:string]) {
+        return nil;
+    }
+    return [NSURL URLWithString:string];
 }
 
 + (void)setServerURLString:(NSString *)urlString {
-    if (urlString.length == 0) {
+    NSString *trimmed = [urlString stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if (trimmed.length == 0) {
         [[NSUserDefaults standardUserDefaults] removeObjectForKey:IUAConfigurationServerURLKey];
     } else {
-        [[NSUserDefaults standardUserDefaults] setObject:urlString forKey:IUAConfigurationServerURLKey];
+        [[NSUserDefaults standardUserDefaults] setObject:trimmed forKey:IUAConfigurationServerURLKey];
     }
     [[NSUserDefaults standardUserDefaults] synchronize];
 }
@@ -74,7 +90,7 @@ static NSString *const kDefaultServerURL = @"ws://127.0.0.1:9800/ws";
 }
 
 + (NSString *)agentVersion {
-    return @"1.0.0";
+    return @"0.3.0";
 }
 
 @end

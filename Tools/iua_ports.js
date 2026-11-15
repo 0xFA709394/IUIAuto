@@ -9,6 +9,9 @@ const execFileAsync = promisify(execFile);
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+/** 默认宿主 Bundle ID；可通过 IUA_BUNDLE_ID 覆盖（与 build.sh/start.sh 保持一致） */
+export const APP_BUNDLE_ID = process.env.IUA_BUNDLE_ID || 'com.iuiauto.example';
+
 /** 端口监听（LISTEN）进程列表 [{pid, command, isOurs}]。
  *  只认 LISTEN 状态：与端口仅有出站连接的进程（如浏览器网络服务）不算占用。 */
 export async function portOccupiers(port) {
@@ -23,7 +26,7 @@ export async function portOccupiers(port) {
     }
     // 只把本项目的 node 工具进程视为"可自动接管"目标
     const isOurs = /\bnode\b/.test(command) &&
-      /(gui_server|mock_server|run_script|record_test)/.test(command);
+      /(gui_server|mock_server|run_script|record_test|appium_bridge|appium_e2e_test|blind_test|edge_test|robust_new)/.test(command);
     result.push({ pid, command: command.split(/\s+/).slice(0, 6).join(' '), isOurs });
   }
   return result;
@@ -105,10 +108,12 @@ export function handleListenError(err, port) {
  * 对已运行但被 App Nap 冻结的 App 无效（simctl launch 不激活），此时靠提示用户点击模拟器窗口。
  * 返回 true 表示已尝试启动。
  */
-export async function tryWakeApp(bundleId = 'com.iuiauto.agent') {
+export async function tryWakeApp(bundleId = APP_BUNDLE_ID) {
   const env = { ...process.env, DEVELOPER_DIR: process.env.DEVELOPER_DIR || '/Applications/Xcode.app/Contents/Developer' };
   const { stdout } = await execFileAsync('xcrun', ['simctl', 'list', 'devices', 'booted'], { env }).catch(() => ({ stdout: '' }));
-  const udid = (stdout.match(/\(([0-9A-F-]{36})\)/) || [])[1];
+  // 只选 iOS 设备行（避免 visionOS 模拟器抢到第一个 booted）
+  const iosLine = stdout.split('\n').find((line) => /iPhone|iPad/.test(line) && /\([0-9A-F-]{36}\)/.test(line));
+  const udid = iosLine ? (iosLine.match(/\(([0-9A-F-]{36})\)/) || [])[1] : null;
   if (!udid) return false;
   const r = await execFileAsync('xcrun', ['simctl', 'launch', udid, bundleId], { env }).catch(() => null);
   return !!r;

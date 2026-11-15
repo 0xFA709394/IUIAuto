@@ -62,6 +62,16 @@ NSErrorDomain const IUACommandErrorDomain = @"IUACommandErrorDomain";
     } else {
         command.timeout = [IUAConfiguration defaultCommandTimeout];
     }
+    // 等待类指令的显式 timeout 可能大于命令默认超时；自动放宽命令超时，避免
+    // 客户端没有额外传 timeout 时，等待在命令层被提前截断。
+    if ([command.action isEqualToString:@"wait"]) {
+        double seconds = [command floatParam:@"seconds" default:0.5];
+        command.timeout = MIN(MAX(command.timeout, seconds + 1.0), [IUAConfiguration maxCommandTimeout]);
+    } else if ([command.action isEqualToString:@"wait_for"] ||
+               [command.action isEqualToString:@"wait_for_element"]) {
+        double seconds = [command floatParam:@"timeout" default:10];
+        command.timeout = MIN(MAX(command.timeout, seconds + 1.0), [IUAConfiguration maxCommandTimeout]);
+    }
     return command;
 }
 

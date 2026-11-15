@@ -144,6 +144,8 @@ SOFTWARE.
     info[@"alpha"] = @(view.alpha);
     info[@"hidden"] = @(view.hidden);
     info[@"enabled"] = @(view.userInteractionEnabled);
+    info[@"window"] = view.window ? NSStringFromClass(view.window.class) : @"(nil)";
+    info[@"windowHidden"] = @(view.window.hidden);
 
     // 常见控件的值
     if ([view isKindOfClass:[UILabel class]]) {
@@ -178,11 +180,35 @@ SOFTWARE.
     UIScreen *screen = UIScreen.mainScreen;
     UIWindow *window = [self keyWindow];
     CGSize size = window ? window.bounds.size : screen.bounds.size;
+    NSDictionary *info = NSBundle.mainBundle.infoDictionary ?: @{};
+
+    NSString *orientation = @"PORTRAIT";
+    UIInterfaceOrientation orientationValue = UIInterfaceOrientationUnknown;
+    if (window.windowScene) {
+        orientationValue = window.windowScene.interfaceOrientation;
+    } else {
+        for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
+            if (![scene isKindOfClass:[UIWindowScene class]]) continue;
+            orientationValue = ((UIWindowScene *)scene).interfaceOrientation;
+            break;
+        }
+    }
+    if (orientationValue == UIInterfaceOrientationLandscapeLeft ||
+        orientationValue == UIInterfaceOrientationLandscapeRight) {
+        orientation = @"LANDSCAPE";
+    }
+
     return @{
         @"agent" : @"IUIAuto",
         @"version" : [IUAConfiguration agentVersion],
         @"systemVersion" : UIDevice.currentDevice.systemVersion,
         @"deviceModel" : [self deviceModelIdentifier],
+        @"deviceName" : UIDevice.currentDevice.name ?: @"",
+        @"bundleId" : info[@"CFBundleIdentifier"] ?: (NSBundle.mainBundle.bundleIdentifier ?: @""),
+        @"appName" : info[@"CFBundleDisplayName"] ?: info[@"CFBundleName"] ?: @"",
+        @"appVersion" : info[@"CFBundleShortVersionString"] ?: @"",
+        @"build" : info[@"CFBundleVersion"] ?: @"",
+        @"orientation" : orientation,
         @"screen" : @{@"width" : @(size.width),
                       @"height" : @(size.height),
                       @"scale" : @(screen.scale)},

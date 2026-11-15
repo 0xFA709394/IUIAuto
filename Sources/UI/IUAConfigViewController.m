@@ -183,6 +183,11 @@
             self.statusLabel.textColor = [UIColor systemOrangeColor];
             return;
         }
+        if (![IUAConfiguration isValidServerURLString:url]) {
+            self.statusLabel.text = @"地址无效，需要 ws:// 或 wss:// 绝对地址";
+            self.statusLabel.textColor = [UIColor systemOrangeColor];
+            return;
+        }
         [[IUAEngine sharedEngine] startWithServerURLString:url];
     }
     [self refreshState];

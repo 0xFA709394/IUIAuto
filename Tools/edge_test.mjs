@@ -78,6 +78,7 @@ wss.on('connection', async (sock) => {
   r = await send('tap', { x: -50, y: -50 }); check('负坐标 tap → 错误不崩溃', !r.ok, r.error?.slice(0, 40));
   r = await send('tap', { x: 99999, y: 99999 }); check('超界坐标 tap → 错误不崩溃', !r.ok, r.error?.slice(0, 40));
   r = await send('type_text', { text: '无目标输入' }); check('type_text 无焦点 → 明确报错', !r.ok, r.error?.slice(0, 40));
+  await send('clear_text', { identifier: 'field.input' });
   r = await send('type_text', { identifier: 'field.input', text: '🎉emoji&<>"边界' });
   check('emoji/特殊字符输入', r.ok);
   r = await send('element_info', { identifier: 'field.input' });
@@ -97,13 +98,13 @@ wss.on('connection', async (sock) => {
     ws.send(raw.replace('__ID__', id));
   });
   let resp = await roundtrip('非JSON', 'this is not json');
-  check('非 JSON 文本被忽略(无崩溃)', resp === null || true); // 被忽略也行，报错也行，只要不崩
+  check('非 JSON 文本被忽略(无响应)', resp === null);
   resp = await roundtrip('JSON数组', '["a","b"]');
-  check('JSON 数组被忽略', resp === null || resp.ok === false || true);
+  check('JSON 数组被忽略(无响应)', resp === null);
   resp = await roundtrip('缺action', '{"id":"__ID__"}');
-  check('缺 action → 错误响应', resp === null || resp.ok === false, resp?.error?.slice(0, 30));
+  check('缺 action 被忽略(无响应)', resp === null, resp?.error?.slice(0, 30));
   resp = await roundtrip('缺id', '{"action":"ping"}');
-  check('缺 id 被忽略', resp === null || true);
+  check('缺 id 被忽略(无响应)', resp === null);
   await alive('非法消息后');
 
   // ---- 4. 状态一致性 ----

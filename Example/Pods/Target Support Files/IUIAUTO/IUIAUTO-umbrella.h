@@ -10,6 +10,7 @@
 #endif
 #endif
 
+#import "IUAElementQuery.h"
 #import "IUAPerfSampler.h"
 #import "IUARecorder.h"
 #import "IUAScreenshotService.h"

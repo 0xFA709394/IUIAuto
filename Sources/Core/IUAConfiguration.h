@@ -39,6 +39,9 @@ extern NSString *const IUAConfigurationServerURLKey;
 + (NSURL *)serverURL;
 + (NSString *)serverURLString;
 
+/// 校验服务器地址：必须是绝对 ws:// 或 wss:// URL 且 host 非空
++ (BOOL)isValidServerURLString:(NSString *)urlString;
+
 /// 保存服务器地址到 UserDefaults
 + (void)setServerURLString:(NSString *)urlString;
 

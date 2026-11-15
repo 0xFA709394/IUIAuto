@@ -32,9 +32,75 @@ typedef NS_ENUM(NSUInteger, IUAWSState) {
     IUAWSStateConnected,
 };
 
-@interface IUAWebSocketClient () <NSURLSessionWebSocketDelegate>
+static void *kIUAWSStateQueueKey = &kIUAWSStateQueueKey;
+static const NSUInteger kIUAWSMaxIncomingMessageBytes = 8 * 1024 * 1024;
+
+/// 仅对本机/内网地址放宽自签名证书；公网 wss 仍走系统默认校验，降低 MITM 面
+static BOOL IUAIsLocalOrPrivateHost(NSString *host) {
+    NSString *lower = host.lowercaseString ?: @"";
+    if (lower.length == 0) return NO;
+    if ([lower isEqualToString:@"localhost"] || [lower hasSuffix:@".local"]) return YES;
+    if ([lower containsString:@":"]) {
+        if ([lower isEqualToString:@"::1"] || [lower hasPrefix:@"fe80:"] ||
+            [lower hasPrefix:@"fc"] || [lower hasPrefix:@"fd"]) return YES;
+    }
+    NSArray<NSString *> *parts = [lower componentsSeparatedByString:@"."];
+    if (parts.count != 4) return NO;
+    NSInteger a = parts[0].integerValue, b = parts[1].integerValue;
+    if (a == 127) return YES;
+    if (a == 10) return YES;
+    if (a == 192 && b == 168) return YES;
+    if (a == 172 && b >= 16 && b <= 31) return YES;
+    return NO;
+}
+
+@class IUAWebSocketClient;
+
+@protocol IUAWSDelegateForwarding <NSObject>
+- (void)URLSession:(NSURLSession *)session
+     webSocketTask:(NSURLSessionWebSocketTask *)webSocketTask
+didOpenWithProtocol:(nullable NSString *)protocol;
+- (void)URLSession:(NSURLSession *)session
+     webSocketTask:(NSURLSessionWebSocketTask *)webSocketTask
+  didCloseWithCode:(NSURLSessionWebSocketCloseCode)closeCode
+            reason:(nullable NSData *)reason;
+- (void)URLSession:(NSURLSession *)session
+didReceiveChallenge:(NSURLAuthenticationChallenge *)challenge
+ completionHandler:(void (^)(NSURLSessionAuthChallengeDisposition disposition, NSURLCredential * _Nullable credential))completionHandler;
+@end
+
+/// 弱转发代理：避免 NSURLSession 强引用 client delegate 形成 client↔session 循环
+@interface IUAWSDelegateProxy : NSObject <NSURLSessionWebSocketDelegate>
+@property (nonatomic, weak, nullable) IUAWebSocketClient<IUAWSDelegateForwarding> *client;
+@end
+
+@implementation IUAWSDelegateProxy
+- (void)URLSession:(NSURLSession *)session
+     webSocketTask:(NSURLSessionWebSocketTask *)webSocketTask
+didOpenWithProtocol:(NSString *)protocol {
+    [self.client URLSession:session webSocketTask:webSocketTask didOpenWithProtocol:protocol];
+}
+- (void)URLSession:(NSURLSession *)session
+     webSocketTask:(NSURLSessionWebSocketTask *)webSocketTask
+  didCloseWithCode:(NSURLSessionWebSocketCloseCode)closeCode
+            reason:(NSData *)reason {
+    [self.client URLSession:session webSocketTask:webSocketTask didCloseWithCode:closeCode reason:reason];
+}
+- (void)URLSession:(NSURLSession *)session
+didReceiveChallenge:(NSURLAuthenticationChallenge *)challenge
+ completionHandler:(void (^)(NSURLSessionAuthChallengeDisposition, NSURLCredential *))completionHandler {
+    if (self.client) {
+        [self.client URLSession:session didReceiveChallenge:challenge completionHandler:completionHandler];
+    } else {
+        completionHandler(NSURLSessionAuthChallengePerformDefaultHandling, nil);
+    }
+}
+@end
+
+@interface IUAWebSocketClient () <IUAWSDelegateForwarding>
 
 @property (nonatomic, strong) NSURLSession *session;
+@property (nonatomic, strong, nullable) IUAWSDelegateProxy *sessionDelegate;
 @property (nonatomic, strong, nullable) NSURLSessionWebSocketTask *task;
 @property (nonatomic, strong) dispatch_queue_t stateQueue; // 状态机串行队列
 @property (nonatomic, assign) IUAWSState state;
@@ -53,19 +119,39 @@ typedef NS_ENUM(NSUInteger, IUAWSState) {
         _state = IUAWSStateIdle;
         _manualDisconnected = NO;
         _stateQueue = dispatch_queue_create("IUAWebSocketClient.state", DISPATCH_QUEUE_SERIAL);
+        dispatch_queue_set_specific(_stateQueue, kIUAWSStateQueueKey, (__bridge void *)self, NULL);
     }
     return self;
 }
 
+- (BOOL)isOnStateQueue {
+    return dispatch_get_specific(kIUAWSStateQueueKey) == (__bridge void *)self;
+}
+
+/// 状态读写统一走 stateQueue；若调用方已在队列内则直接执行，避免死锁
+- (void)performOnStateQueue:(dispatch_block_t)block {
+    if ([self isOnStateQueue]) {
+        block();
+    } else {
+        dispatch_sync(self.stateQueue, block);
+    }
+}
+
 - (BOOL)isConnected {
-    return self.state == IUAWSStateConnected;
+    __block BOOL connected = NO;
+    [self performOnStateQueue:^{
+        connected = (self.state == IUAWSStateConnected);
+    }];
+    return connected;
 }
 
 - (void)dealloc {
-    // 循环引用兜底：session 强引用 self，正常路径靠 disconnect 打破；
-    // 若外部未 disconnect 即释放（父对象不再持有时 session 仍持 self），
-    // 这里 invalidate 让 session 放开引用
+    [self stopHeartbeat];
+    // 正常路径必须由持有方调用 disconnect；session 会强引用 delegate，
+    // 未 disconnect 直接释放时 dealloc 实际不会执行（这是 NSURLSession 的约定）。
+    // 这里保留 invalidate 兜底，覆盖 session 尚未创建/已被外部置空的情况。
     [_session finishTasksAndInvalidate];
+    _sessionDelegate = nil;
 }
 
 #pragma mark - 连接管理
@@ -116,6 +202,20 @@ typedef NS_ENUM(NSUInteger, IUAWSState) {
 }
 
 - (void)handleDisconnectWithError:(nullable NSError *)error {
+    // 回调来自 session delegate queue / 心跳回调 / send 完成回调，
+    // 统一回到 stateQueue，避免与 connect/disconnect 并发修改状态。
+    if ([self isOnStateQueue]) {
+        [self handleDisconnectOnStateQueue:error];
+        return;
+    }
+    __weak typeof(self) weakSelf = self;
+    dispatch_async(self.stateQueue, ^{
+        __strong typeof(weakSelf) strongSelf = weakSelf;
+        [strongSelf handleDisconnectOnStateQueue:error];
+    });
+}
+
+- (void)handleDisconnectOnStateQueue:(nullable NSError *)error {
     if (self.state == IUAWSStateIdle) {
         return; // 已是关闭状态（主动断开路径已处理）
     }
@@ -176,6 +276,10 @@ typedef NS_ENUM(NSUInteger, IUAWSState) {
 }
 
 - (void)handleTextMessage:(NSString *)text {
+    if (text.length > kIUAWSMaxIncomingMessageBytes) {
+        IUALogWarn(@"WS: 收到超大消息（%lu 字符），已丢弃", (unsigned long)text.length);
+        return;
+    }
     NSData *data = [text dataUsingEncoding:NSUTF8StringEncoding];
     if (!data) {
         IUALogWarn(@"WS: 收到无法解码的消息");
@@ -191,25 +295,30 @@ typedef NS_ENUM(NSUInteger, IUAWSState) {
 }
 
 - (BOOL)sendJSON:(NSDictionary<NSString *, id> *)json {
-    if (self.state != IUAWSStateConnected || !self.task) {
-        return NO;
-    }
-    NSError *error = nil;
-    NSData *data = [NSJSONSerialization dataWithJSONObject:json options:0 error:&error];
-    if (!data) {
-        IUALogError(@"WS: JSON 序列化失败: %@", error.localizedDescription);
-        return NO;
-    }
-    NSURLSessionWebSocketMessage *message = [[NSURLSessionWebSocketMessage alloc] initWithString:[[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding]];
-    __weak typeof(self) weakSelf = self;
-    [self.task sendMessage:message completionHandler:^(NSError * _Nullable sendError) {
-        if (sendError) {
-            IUALogWarn(@"WS: 发送失败: %@", sendError.localizedDescription);
-            // 发送失败通常意味着连接已死，走断开流程触发重连
-            [weakSelf handleDisconnectWithError:sendError];
+    __block BOOL sent = NO;
+    [self performOnStateQueue:^{
+        if (self.state != IUAWSStateConnected || !self.task) {
+            return;
         }
+        NSError *error = nil;
+        NSData *data = [NSJSONSerialization dataWithJSONObject:json options:0 error:&error];
+        if (!data) {
+            IUALogError(@"WS: JSON 序列化失败: %@", error.localizedDescription);
+            return;
+        }
+        NSURLSessionWebSocketMessage *message = [[NSURLSessionWebSocketMessage alloc]
+            initWithString:[[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding]];
+        __weak typeof(self) weakSelf = self;
+        [self.task sendMessage:message completionHandler:^(NSError * _Nullable sendError) {
+            if (sendError) {
+                IUALogWarn(@"WS: 发送失败: %@", sendError.localizedDescription);
+                // 发送失败通常意味着连接已死，走断开流程触发重连
+                [weakSelf handleDisconnectWithError:sendError];
+            }
+        }];
+        sent = YES;
     }];
-    return YES;
+    return sent;
 }
 
 #pragma mark - 心跳
@@ -283,8 +392,9 @@ didOpenWithProtocol:(NSString * _Nullable)protocol {
 
 - (void)URLSession:(NSURLSession *)session didReceiveChallenge:(NSURLAuthenticationChallenge *)challenge
                                      completionHandler:(void (^)(NSURLSessionAuthChallengeDisposition disposition, NSURLCredential *credential))completionHandler {
-    // 内网自签名场景直接信任（工具型 App，风险已知）
-    if ([challenge.protectionSpace.authenticationMethod isEqualToString:NSURLAuthenticationMethodServerTrust]) {
+    // 内网自签名场景放宽；公网地址不走该分支（仍由系统校验证书链）
+    if ([challenge.protectionSpace.authenticationMethod isEqualToString:NSURLAuthenticationMethodServerTrust] &&
+        IUAIsLocalOrPrivateHost(self.URL.host)) {
         SecTrustRef trust = challenge.protectionSpace.serverTrust;
         if (trust) {
             completionHandler(NSURLSessionAuthChallengeUseCredential, [NSURLCredential credentialForTrust:trust]);
@@ -301,8 +411,15 @@ didOpenWithProtocol:(NSString * _Nullable)protocol {
         NSOperationQueue *delegateQueue = [[NSOperationQueue alloc] init];
         delegateQueue.maxConcurrentOperationCount = 1; // 串行队列，保证 delegate 回调有序
         delegateQueue.name = @"IUAWebSocketClient.delegateQueue";
-        _session = [NSURLSession sessionWithConfiguration:[NSURLSessionConfiguration defaultSessionConfiguration]
-                                                 delegate:self
+        NSURLSessionConfiguration *configuration = [NSURLSessionConfiguration defaultSessionConfiguration];
+        // 避免服务器不可达时长期停留在 Connecting（否则 state 永远不会进入 Idle，重连逻辑失效）
+        configuration.timeoutIntervalForRequest = 15.0;
+        configuration.timeoutIntervalForResource = 0; // WebSocket 长连接不应因资源超时被中断
+        IUAWSDelegateProxy *proxy = [[IUAWSDelegateProxy alloc] init];
+        proxy.client = self;
+        _sessionDelegate = proxy;
+        _session = [NSURLSession sessionWithConfiguration:configuration
+                                                 delegate:proxy
                                             delegateQueue:delegateQueue];
     }
     return _session;

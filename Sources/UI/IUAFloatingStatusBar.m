@@ -94,6 +94,13 @@ static CGFloat const kIUABarHPadding = 15.0f;
 
 #pragma mark - 显示/隐藏
 
+- (void)revealForAutomation {
+    if (self.barView && self.barView.alpha <= 0.01f) {
+        [self.barView.layer removeAllAnimations];
+        self.barView.alpha = 0.97f;
+    }
+}
+
 - (void)hideBar {
     [self stopPulse];
     [UIView animateWithDuration:0.25
@@ -152,8 +159,12 @@ static CGFloat const kIUABarHPadding = 15.0f;
                                    textWidth,
                                    self.label.intrinsicContentSize.height);
 
-    if (self.barView.alpha < 0.99f) {
-        self.barView.alpha = 0.0f;
+    // 只有完全隐藏时才播放入场动画；不能把 alpha=0.97 的已显示状态反复重置为 0，
+    // 否则每条指令的 busy 刷新都会让悬浮条闪一下，并导致 tap_view bar.floating 偶发失败。
+    if (self.barView.alpha <= 0.01f) {
+        if (self.busy) {
+            return; // 指令执行中不要重新弹出遮挡目标
+        }
         self.barView.transform = CGAffineTransformMakeTranslation(0, -6.0f);
         [UIView animateWithDuration:0.3
                               delay:0
@@ -179,7 +190,6 @@ static CGFloat const kIUABarHPadding = 15.0f;
     // 毛玻璃胶囊容器
     UIVisualEffectView *bar = [[UIVisualEffectView alloc] initWithEffect:
                                [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemChromeMaterialDark]];
-    bar.accessibilityIdentifier = @"bar.floating";
     bar.frame = CGRectZero;   // 由 showBar 完整布局
     bar.layer.cornerRadius = kIUABarHeight / 2.0f;
     bar.layer.masksToBounds = YES;

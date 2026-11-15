@@ -25,7 +25,14 @@ SOFTWARE.
 #import "IUALogger.h"
 
 static void (^gLogForwarder)(IUALogLevel level, NSString *message) = nil;
+static NSLock *gLogLock = nil;
 IUALogLevel IUALogConsoleLevel = IUALogLevelDebug;
+
+static NSLock *IUALogLock(void) {
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{ gLogLock = [[NSLock alloc] init]; });
+    return gLogLock;
+}
 
 static NSString *IUALogLevelName(IUALogLevel level) {
     switch (level) {
@@ -45,11 +52,16 @@ void IUALog(IUALogLevel level, NSString *format, ...) {
     if (level >= IUALogConsoleLevel) {
         NSLog(@"[IUIAuto][%@] %@", IUALogLevelName(level), message);
     }
-    if (gLogForwarder) {
-        gLogForwarder(level, message);
+    [IUALogLock() lock];
+    void (^forwarder)(IUALogLevel, NSString *) = [gLogForwarder copy];
+    [IUALogLock() unlock];
+    if (forwarder) {
+        forwarder(level, message);
     }
 }
 
 void IUASetLogForwarder(void (^forwarder)(IUALogLevel level, NSString *message)) {
+    [IUALogLock() lock];
     gLogForwarder = [forwarder copy];
+    [IUALogLock() unlock];
 }

@@ -75,7 +75,8 @@ async function detectBootedSimulator() {
   const { stdout } = await execFileAsync('xcrun', ['simctl', 'list', 'devices', 'booted'], {
     env: { ...process.env, DEVELOPER_DIR: process.env.DEVELOPER_DIR || '/Applications/Xcode.app/Contents/Developer' },
   });
-  const m = stdout.match(/\(([0-9A-F-]{36})\)/);
+  const iosLine = stdout.split('\n').find((line) => /iPhone|iPad/.test(line) && /\([0-9A-F-]{36}\)/.test(line));
+  const m = iosLine ? iosLine.match(/\(([0-9A-F-]{36})\)/) : null;
   return m ? m[1] : null;
 }
 
@@ -130,7 +131,13 @@ function send(action, params = {}, timeoutSec = 20) {
     const id = `s-${++seq}`;
     const timer = setTimeout(() => { pending.delete(id); resolve({ ok: false, error: `超时 ${timeoutSec}s` }); }, timeoutSec * 1000);
     pending.set(id, { resolve, timer });
-    socket.send(JSON.stringify({ id, action, params, timeout: timeoutSec }));
+    try {
+      socket.send(JSON.stringify({ id, action, params, timeout: timeoutSec }));
+    } catch (e) {
+      clearTimeout(timer);
+      pending.delete(id);
+      resolve({ ok: false, error: `发送失败: ${e.message}` });
+    }
   });
 }
 
@@ -173,7 +180,10 @@ async function runScript() {
 
   const outcome = await runSteps(steps, send,
     (r) => console.log(`${r.pass ? '✓' : '✗'} L${String(r.line).padStart(3)} ${r.desc} ${r.pass ? '' : '— ' + r.detail}`),
-    { shotSaver: async (file, base64) => writeFileSync(file, Buffer.from(base64, 'base64')) });
+    {
+      shotSaver: async (file, base64) => writeFileSync(file, Buffer.from(base64, 'base64')),
+      textSaver: async (file, text) => writeFileSync(file, text, 'utf8'),
+    });
 
   if (!outcome.ok) await saveShot('fail.png');
 
