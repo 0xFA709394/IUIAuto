@@ -51,6 +51,10 @@ node appium_bridge.js --takeover
 `POST /session` 返回的 capabilities 还会包含 `appium:platformVersion`、`appium:deviceModel`、
 `appium:appVersion`、`appium:elementStrategies` 等。`appium:automationName` 固定回写为 `IUIAuto`。
 
+> `appium:udid`（或环境变量 `IUA_UDID`）：指定目标模拟器。宿主侧设备管理（App 生命周期/
+> 安装/文件/录屏）只在模拟器上可用；未显式指定 udid 时按 App 上报的机型自动判断，
+> 恰好一台模拟器 booted 时自动选中，多台时必须指定。
+
 > 旧式 JSON Wire 的 `desiredCapabilities` 也兼容；W3C 的 `capabilities.alwaysMatch/firstMatch` 优先。
 
 ---
@@ -203,10 +207,19 @@ curl -s -X POST http://127.0.0.1:4723/session/<SID>/element \
 | POST | `/session/:id/appium/device/set_clipboard` | 写剪贴板 |
 | GET/POST | `/session/:id/appium/device/get_clipboard` | 读剪贴板 |
 | POST | `/session/:id/appium/device/delete_clipboard` | 清空剪贴板 |
-| POST | `/session/:id/appium/device/activate_app` | 当前 App（no-op） |
+| POST | `/session/:id/appium/device/activate_app` | 拉起 App 到前台（任意 bundleId） |
+| POST | `/session/:id/appium/device/terminate_app` | 结束 App（任意 bundleId） |
+| POST | `/session/:id/appium/device/background_app` | 切后台 `{seconds}` 后自动拉回 |
 | POST | `/session/:id/appium/device/app_state` | App 状态（1/3/4，WebdriverIO 标准路径） |
 | POST | `/session/:id/appium/device/query_app_state` | 同上（别名） |
-| POST | `/session/:id/appium/device/app_installed` | 当前 App 是否安装 |
+| POST | `/session/:id/appium/device/app_installed` | 任意 App 是否安装 |
+| POST | `/session/:id/appium/device/install_app` | 安装 `{appPath}`（宿主 .app 路径） |
+| POST | `/session/:id/appium/device/remove_app` | 卸载 `{appId}` |
+| POST | `/session/:id/appium/device/push_file` | 写文件 `{path, payload(base64)}` |
+| POST | `/session/:id/appium/device/pull_file` | 读文件 → base64 |
+| POST | `/session/:id/appium/device/pull_folder` | 打包目录 → base64 zip |
+| POST | `/session/:id/appium/start_recording_screen` | 开始录屏（同一会话一路） |
+| POST | `/session/:id/appium/stop_recording_screen` | 停止录屏 → base64 mp4 |
 | POST | `/session/:id/alert/accept|dismiss` | W3C 标准弹窗接受/关闭 |
 | GET/POST | `/session/:id/alert/text` | W3C 标准弹窗文本/设置文本 |
 | POST | `/session/:id/appium/alert/accept|dismiss` | Appium 别名（同上） |
@@ -250,19 +263,66 @@ curl -s -X POST http://127.0.0.1:4723/session/<SID>/element \
 | `mobile: viewportScreenshot` | — |
 | `mobile: performanceData` / `startPerfRecord` / `stopPerfRecord` | — |
 | `mobile: getDeviceTime` / `batteryInfo` / `queryAppState` | — |
+| `mobile: activateApp` / `terminateApp` / `backgroundApp` | `bundleId?`（缺省当前 App）、`seconds` |
+| `mobile: installApp` / `removeApp` / `isAppInstalled` | `app`（宿主 .app 路径）、`appId`、`bundleId` |
+| `mobile: pushFile` / `pullFile` / `pullFolder` | `path`、`payload|data` |
+| `mobile: startRecordingScreen` / `stopRecordingScreen` | —（停止返回 base64 mp4） |
 | `mobile: shake` | — |
 
 **明确不支持**（进程内 Agent 的边界）：
-`terminateApp`、`backgroundApp`、`lock`/`unlock`/`isLocked`、`pressKeyCode`（Android）、
-`startActivity`（Android）、`installApp`/`removeApp`、`pushFile`/`pullFile`、
-`startRecordingScreen`/`stopRecordingScreen`。这些需要宿主/模拟器侧的进程/文件控制，可用 `xcrun simctl` 在测试脚本中完成。
+`lock`/`unlock`/`isLocked`、`pressKeyCode`（Android）、`startActivity`（Android）。
+App 管理 / 文件 / 录屏已通过宿主 `xcrun simctl` 支持（见下节，仅模拟器）。
 
 > `mobile: tap`/`doubleTap`/`touchAndHold` 在同时提供 `element` 时，`x`/`y` 按“相对元素左上角”处理；
 > `mobile: dragFromToForDuration` 的四个坐标同样按元素相对坐标平移。
 
 ---
 
-## 7. 边界与排错
+## 7. 宿主侧设备管理（仅模拟器）
+
+桥跑在 macOS 宿主上，参考 Appium XCUITest driver 把“进程外”能力通过 `xcrun simctl` 补齐
+（实现见 `Tools/iua_simctl.js`）：
+
+| 能力 | 语义 |
+|---|---|
+| `activateApp` / `terminateApp` | 任意 bundleId；对未运行的 App terminate 也算成功（Appium 语义） |
+| `backgroundApp(seconds)` | terminate → 等待 → 重新 launch；当前 App 会自动等 WS 重连 |
+| `queryAppState` | 其他 App：`3`（后台运行）/`1`（未运行）；当前 App 走进程内精确值（4 等） |
+| `isAppInstalled` / `installApp` / `removeApp` | `listapps` / `install` / `uninstall` |
+| `pushFile` / `pullFile` / `pullFolder` | `@bundleId/相对路径` → App 数据容器；或绝对路径；pullFolder 返回 zip base64 |
+| `startRecordingScreen` / `stopRecordingScreen` | `simctl io recordVideo`；同一会话一路；stop 返回 mp4 base64；会话结束自动收尾 |
+
+约束：
+
+- **UDID 解析**：`appium:udid` capability / `IUA_UDID` 环境变量显式指定；否则要求恰好一台
+  booted 模拟器（0 台报错、多台要求指定）。
+- **真机**：App 上报机型为真机（`iPhone17,1` 等）且未显式给 udid 时，上述端点返回
+  `unsupported operation`；`activateApp`（当前 App）、`isAppInstalled`/`app_state` 保持
+  原降级语义（true / false / 0）。
+- **文件安全**：`@bundleId/…` 路径 resolve 后必须仍在数据容器内（防穿越）；单文件/目录
+  传输上限 64MB。
+- **录屏**：`recordVideo` 需要 SIGINT 优雅结束才有可用的 mp4（内部已处理）；
+  `timeLimit`/`remotePath` 等选项暂不支持，静默忽略。
+
+示例（WebdriverIO）：
+
+```js
+await driver.execute('mobile: pushFile', [{
+  path: '@com.iuiauto.example/Documents/seed.json',
+  data: Buffer.from('{"v":1}').toString('base64'),
+}]);
+
+await driver.startRecordingScreen();        // 开始录屏
+await driver.$('~btn.counter').click();
+const mp4 = await driver.stopRecordingScreen();  // base64 mp4
+require('fs').writeFileSync('demo.mp4', Buffer.from(mp4, 'base64'));
+
+await driver.backgroundApp(2);              // 切后台 2s 后拉回，自动等重连
+```
+
+---
+
+## 8. 边界与排错
 
 - **单会话**：一个 App 连接同一时间只允许一个 WebDriver session；先 `DELETE /session/:id` 再建新会话。
 - **仅宿主 App**：所有元素/截图/源码来自 IUIAuto 所在 App 进程；无法自动化其他 App。

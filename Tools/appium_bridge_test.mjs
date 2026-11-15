@@ -12,8 +12,12 @@
  */
 
 import assert from 'node:assert/strict';
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { createAppiumBridge } from './appium_bridge.js';
 import { translateActions, ELEMENT_KEY } from './iua_webdriver_actions.js';
+import { createSimctl } from './iua_simctl.js';
 
 const tests = [];
 function test(name, fn) {
@@ -23,7 +27,7 @@ function test(name, fn) {
 // ---------------------------------------------------------------------------
 // 假 App
 // ---------------------------------------------------------------------------
-function createFakeApp() {
+function createFakeApp(deviceModel = 'arm64') {
   const state = {
     counter: 0,
     text: '',
@@ -170,7 +174,7 @@ function createFakeApp() {
       case 'device_info':
         return { ok: true, data: {
           name: 'iPhone 17 Pro', systemVersion: '26.5', bundleId: 'com.iuiauto.example',
-          appVersion: '1.0', deviceModel: 'arm64', locale: 'en_CN', language: 'zh-Hans-CN',
+          appVersion: '1.0', deviceModel, locale: 'en_CN', language: 'zh-Hans-CN',
           windowSize: { width: 402, height: 874 }, screen: { width: 402, height: 874, scale: 3 },
           time: '2026-11-07T15:00:00Z', batteryLevel: -1, batteryState: 'unknown',
         } };
@@ -356,13 +360,73 @@ test('translateActions: keyboard', async () => {
 });
 
 // ---------------------------------------------------------------------------
+// 假 simctl（宿主侧设备管理的离线替身）
+// ---------------------------------------------------------------------------
+const FAKE_UDID = '11111111-2222-3333-4444-555555555555';
+
+function createFakeSimctl() {
+  const calls = [];
+  const container = mkdtempSync(join(tmpdir(), 'iua-simctl-test-'));
+  let running = new Set(['com.iuiauto.example']);
+  let videoStops = 0;
+
+  const fakeRun = async (args) => {
+    calls.push(args.join(' '));
+    const [sub, ...rest] = args;
+    if (sub === 'list' && rest[0] === 'devices') {
+      return JSON.stringify({ devices: { 'iOS 26.5': [
+        { udid: FAKE_UDID, name: 'iPhone 17 Pro', state: 'Booted' },
+      ] } });
+    }
+    if (sub === 'launch') {
+      running.add(rest[1]);
+      return `${rest[1]}: 4242\n`;
+    }
+    if (sub === 'terminate') {
+      running.delete(rest[1]);
+      return '';
+    }
+    if (sub === 'listapps') {
+      return `<?xml version="1.0"?><plist version="1.0"><dict>` +
+        `<key>com.iuiauto.example</key><dict><key>CFBundleIdentifier</key>` +
+        `<string>com.iuiauto.example</string></dict></dict></plist>`;
+    }
+    if (sub === 'get_app_container') return `${container}\n`;
+    if (sub === 'spawn') {
+      return [...running].map((b) => `-\t0\tUIKitApplication:${b}`).join('\n') + '\n';
+    }
+    if (sub === 'install' || sub === 'uninstall') return '';
+    throw new Error('fake simctl 未实现的子命令: ' + args.join(' '));
+  };
+
+  const fakeSpawnVideo = (args) => {
+    calls.push(args.join(' '));
+    const videoPath = args[args.length - 1];
+    // 模拟 recordVideo：启动即产出文件（真实实现是停止时 finalize）
+    writeFileSync(videoPath, Buffer.from('fake-mp4-bytes'));
+    return { stop: async () => { videoStops += 1; } };
+  };
+
+  const simctl = createSimctl({ run: fakeRun, spawnVideo: fakeSpawnVideo, log: () => {} });
+  return {
+    simctl,
+    calls,
+    container,
+    setRunning: (bundles) => { running = new Set(bundles); },
+    get videoStops() { return videoStops; },
+  };
+}
+
+const simctlFake = createFakeSimctl();
+
+// ---------------------------------------------------------------------------
 // 桥端到端（假 App）
 // ---------------------------------------------------------------------------
 const fake = createFakeApp();
 const hello = {
   type: 'hello',
   agent: 'IUIAuto',
-  version: '0.3.0',
+  version: '0.4.0',
   environment: { systemVersion: '26.5', deviceModel: 'arm64' },
   actions: ['find_elements', 'element_action', 'page_source'],
 };
@@ -371,6 +435,7 @@ const bridge = createAppiumBridge({
   getHello: () => hello,
   sessionWaitMs: 1000,
   log: () => {},
+  simctl: simctlFake.simctl,
 });
 await new Promise((resolve) => bridge.server.listen(0, '127.0.0.1', resolve));
 const base = `http://127.0.0.1:${bridge.server.address().port}`;
@@ -613,6 +678,181 @@ test('Appium app_state / app_installed endpoints', async () => {
   assert.equal(r.json.value, false);
 });
 
+// ---------------------------------------------------------------------------
+// 宿主侧设备管理（simctl 假执行器）
+// ---------------------------------------------------------------------------
+test('simctl: activateApp / terminateApp / backgroundApp', async () => {
+  // 未运行的 App terminate 同样成功（Appium 语义），且不实际下发 terminate
+  let r = await request('POST', `/session/${sessionId}/appium/device/terminate_app`, { appId: 'com.other.app' });
+  assert.equal(r.status, 200);
+  assert.equal(simctlFake.calls.includes(`terminate ${FAKE_UDID} com.other.app`), false);
+  // activate 其他 App → simctl launch
+  r = await request('POST', `/session/${sessionId}/appium/device/activate_app`, { appId: 'com.other.app' });
+  assert.equal(r.status, 200);
+  assert.ok(simctlFake.calls.includes(`launch ${FAKE_UDID} com.other.app`));
+  // 运行中的 App terminate → 实际下发
+  r = await request('POST', `/session/${sessionId}/appium/device/terminate_app`, { appId: 'com.other.app' });
+  assert.equal(r.status, 200);
+  assert.ok(simctlFake.calls.includes(`terminate ${FAKE_UDID} com.other.app`));
+  // background 当前 App（seconds=0 → 立即拉回前台）
+  r = await request('POST', `/session/${sessionId}/appium/device/background_app`, { seconds: 0 });
+  assert.equal(r.status, 200);
+  assert.ok(simctlFake.calls.includes(`terminate ${FAKE_UDID} com.iuiauto.example`));
+  assert.ok(simctlFake.calls.includes(`launch ${FAKE_UDID} com.iuiauto.example`));
+});
+
+test('simctl: app_state / app_installed for other bundles', async () => {
+  // com.other.app 已被 terminate → 未运行（1）；未安装 → installed=false
+  let r = await request('POST', `/session/${sessionId}/appium/device/app_state`, { bundleId: 'com.other.app' });
+  assert.equal(r.status, 200);
+  assert.equal(r.json.value, 1);
+  r = await request('POST', `/session/${sessionId}/appium/device/app_installed`, { bundleId: 'com.other.app' });
+  assert.equal(r.json.value, false);
+  // 重新 launch 后 → 后台运行（3）
+  await request('POST', `/session/${sessionId}/appium/device/activate_app`, { appId: 'com.other.app' });
+  r = await request('POST', `/session/${sessionId}/appium/device/app_state`, { bundleId: 'com.other.app' });
+  assert.equal(r.json.value, 3);
+  simctlFake.setRunning(['com.iuiauto.example']);
+});
+
+test('simctl: push_file / pull_file / pull_folder', async () => {
+  const payload = Buffer.from('IUIAuto push/pull 你好', 'utf8').toString('base64');
+  let r = await request('POST', `/session/${sessionId}/appium/device/push_file`, {
+    path: '@com.iuiauto.example/Documents/e2e.txt',
+    payload,
+  });
+  assert.equal(r.status, 200);
+  // 容器内真实落盘
+  assert.equal(readFileSync(join(simctlFake.container, 'Documents/e2e.txt'), 'utf8'), 'IUIAuto push/pull 你好');
+  r = await request('POST', `/session/${sessionId}/appium/device/pull_file`, {
+    path: '@com.iuiauto.example/Documents/e2e.txt',
+  });
+  assert.equal(r.json.value, payload);
+  // 不存在的文件 → no such file 404
+  r = await request('POST', `/session/${sessionId}/appium/device/pull_file`, {
+    path: '@com.iuiauto.example/Documents/none.txt',
+  });
+  assert.equal(r.status, 404);
+  assert.equal(r.json.value.error, 'no such file');
+  // 目录 → zip（PK 头）
+  r = await request('POST', `/session/${sessionId}/appium/device/pull_folder`, {
+    folderPath: '@com.iuiauto.example/Documents',
+  });
+  assert.equal(r.status, 200);
+  assert.equal(Buffer.from(r.json.value, 'base64').subarray(0, 2).toString(), 'PK');
+  // 相对路径 → invalid argument
+  r = await request('POST', `/session/${sessionId}/appium/device/push_file`, { path: 'relative/x', payload });
+  assert.equal(r.status, 400);
+  assert.equal(r.json.value.error, 'invalid argument');
+  // 越出容器的路径 → invalid argument
+  r = await request('POST', `/session/${sessionId}/appium/device/pull_file`, {
+    path: '@com.iuiauto.example/../escape.txt',
+  });
+  assert.equal(r.status, 400);
+});
+
+test('simctl: screen recording lifecycle', async () => {
+  let r = await request('POST', `/session/${sessionId}/appium/start_recording_screen`);
+  assert.equal(r.status, 200);
+  // 同一会话重复开始 → 报错
+  r = await request('POST', `/session/${sessionId}/appium/start_recording_screen`);
+  assert.equal(r.status, 500);
+  assert.match(r.json.value.message, /已在进行中/);
+  // 停止 → base64 mp4
+  r = await request('POST', `/session/${sessionId}/appium/stop_recording_screen`);
+  assert.equal(r.status, 200);
+  assert.equal(Buffer.from(r.json.value, 'base64').toString(), 'fake-mp4-bytes');
+  // 没有进行中的录屏再停止 → 404
+  r = await request('POST', `/session/${sessionId}/appium/stop_recording_screen`);
+  assert.equal(r.status, 404);
+});
+
+test('mobile: installApp / removeApp / isAppInstalled / pushFile / queryAppState', async () => {
+  let r = await request('POST', `/session/${sessionId}/execute/sync`, {
+    script: 'mobile: isAppInstalled', args: [{ bundleId: 'com.iuiauto.example' }],
+  });
+  assert.equal(r.json.value, true);
+  // 临时 .app 目录 → installApp
+  const appDir = join(simctlFake.container, '..', 'Fake.app');
+  mkdirSync(appDir, { recursive: true });
+  r = await request('POST', `/session/${sessionId}/execute/sync`, {
+    script: 'mobile: installApp', args: [{ app: appDir }],
+  });
+  assert.equal(r.status, 200);
+  assert.equal(r.json.value, true);
+  assert.ok(simctlFake.calls.includes(`install ${FAKE_UDID} ${appDir}`));
+  // 未安装的 App removeApp → false（不实际卸载）
+  r = await request('POST', `/session/${sessionId}/execute/sync`, {
+    script: 'mobile: removeApp', args: [{ appId: 'com.not.installed' }],
+  });
+  assert.equal(r.json.value, false);
+  // mobile: pushFile（data 参数名）
+  const payload = Buffer.from('mobile push').toString('base64');
+  r = await request('POST', `/session/${sessionId}/execute/sync`, {
+    script: 'mobile: pushFile', args: [{ path: '@com.iuiauto.example/tmp/m.txt', data: payload }],
+  });
+  assert.equal(r.status, 200);
+  r = await request('POST', `/session/${sessionId}/execute/sync`, {
+    script: 'mobile: pullFile', args: [{ path: '@com.iuiauto.example/tmp/m.txt' }],
+  });
+  assert.equal(r.json.value, payload);
+  // mobile: queryAppState 指定其他 bundleId → 走 simctl 探测
+  r = await request('POST', `/session/${sessionId}/execute/sync`, {
+    script: 'mobile: queryAppState', args: [{ bundleId: 'com.other.app' }],
+  });
+  assert.equal(r.json.value, 1);
+});
+
+test('real device: host-side management returns unsupported', async () => {
+  const realFake = createFakeApp('iPhone17,1');
+  const realHello = {
+    type: 'hello',
+    agent: 'IUIAuto',
+    version: '0.4.0',
+    environment: { systemVersion: '26.5', deviceModel: 'iPhone17,1' },
+    actions: [],
+  };
+  const realBridge = createAppiumBridge({
+    send: realFake.send,
+    getHello: () => realHello,
+    sessionWaitMs: 500,
+    log: () => {},
+    simctl: simctlFake.simctl, // 即使注入也不应被调用（真机会话）
+  });
+  await new Promise((resolve) => realBridge.server.listen(0, '127.0.0.1', resolve));
+  const realBase = `http://127.0.0.1:${realBridge.server.address().port}`;
+  const post = async (path, body) => {
+    const response = await fetch(realBase + path, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(10000),
+    });
+    return { status: response.status, json: await response.json() };
+  };
+  const created = await post('/session', {
+    capabilities: { alwaysMatch: { platformName: 'iOS', 'appium:automationName': 'IUIAuto' } },
+  });
+  const sid = created.json.value.sessionId;
+  const simctlCallsBefore = simctlFake.calls.length;
+
+  let r = await post(`/session/${sid}/appium/device/terminate_app`, { appId: 'com.any.app' });
+  assert.equal(r.status, 500);
+  assert.equal(r.json.value.error, 'unsupported operation');
+  // 真机激活"当前 App"仍可用（App 本就在前台）
+  r = await post(`/session/${sid}/appium/device/activate_app`, { bundleId: 'com.iuiauto.example' });
+  assert.equal(r.status, 200);
+  // 其他 App：installed=false / state=0，且不触碰 simctl
+  r = await post(`/session/${sid}/appium/device/app_installed`, { bundleId: 'com.other.app' });
+  assert.equal(r.json.value, false);
+  r = await post(`/session/${sid}/appium/device/app_state`, { bundleId: 'com.other.app' });
+  assert.equal(r.json.value, 0);
+  assert.equal(simctlFake.calls.length, simctlCallsBefore);
+
+  await fetch(`${realBase}/session/${sid}`, { method: 'DELETE' });
+  await realBridge.close();
+});
+
 test('W3C active element endpoint', async () => {
   // 假 App 的 active_element 返回 xpath；active 端点应返回可用的元素句柄
   const r = await request('GET', `/session/${sessionId}/element/active`);
@@ -653,10 +893,14 @@ test('invalid session id', async () => {
   assert.equal(r.json.value.error, 'invalid session id');
 });
 
-test('DELETE /session', async () => {
+test('DELETE /session stops active recording', async () => {
+  const stopsBefore = simctlFake.videoStops;
+  const started = await request('POST', `/session/${sessionId}/appium/start_recording_screen`);
+  assert.equal(started.status, 200);
   const r = await request('DELETE', `/session/${sessionId}`);
   assert.equal(r.status, 200);
   assert.equal(r.json.value, null);
+  assert.equal(simctlFake.videoStops, stopsBefore + 1, '会话结束应停止在录的屏');
   const after = await request('GET', `/session/${sessionId}/source`);
   assert.equal(after.status, 404);
   assert.equal(after.json.value.error, 'invalid session id');

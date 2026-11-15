@@ -259,6 +259,36 @@ async function main() {
     check('mobile: deviceInfo', deviceInfo.status === 200 && deviceInfo.json.value.bundleId === BUNDLE_ID,
       deviceInfo.json.value?.bundleId ?? '');
 
+    // ---- 宿主侧设备管理（simctl）----
+    const pushPayload = Buffer.from('e2e push file 你好').toString('base64');
+    let mgmt = await request('POST', `/session/${sessionId}/appium/device/push_file`, {
+      path: `@${BUNDLE_ID}/Documents/e2e.txt`, payload: pushPayload,
+    });
+    check('宿主 push_file', mgmt.status === 200, JSON.stringify(mgmt.json?.value?.error ?? ''));
+    mgmt = await request('POST', `/session/${sessionId}/appium/device/pull_file`, {
+      path: `@${BUNDLE_ID}/Documents/e2e.txt`,
+    });
+    check('宿主 pull_file', mgmt.status === 200 && mgmt.json.value === pushPayload);
+    mgmt = await request('POST', `/session/${sessionId}/appium/device/app_installed`, { bundleId: 'com.apple.mobilesafari' });
+    check('宿主 isAppInstalled（其他 App）', mgmt.status === 200 && mgmt.json.value === true);
+    mgmt = await request('POST', `/session/${sessionId}/appium/device/app_installed`, { bundleId: 'com.nope.missing' });
+    check('宿主 isAppInstalled（未安装）', mgmt.status === 200 && mgmt.json.value === false);
+    mgmt = await request('POST', `/session/${sessionId}/appium/device/app_state`, { bundleId: 'com.apple.mobilesafari' });
+    check('宿主 app_state（其他 App）', mgmt.status === 200 && (mgmt.json.value === 1 || mgmt.json.value === 3),
+      String(mgmt.json.value));
+
+    mgmt = await request('POST', `/session/${sessionId}/appium/start_recording_screen`);
+    check('开始录屏', mgmt.status === 200);
+    await sleep(1500);
+    mgmt = await request('POST', `/session/${sessionId}/appium/stop_recording_screen`);
+    check('停止录屏返回 mp4', mgmt.status === 200 && (mgmt.json.value?.length ?? 0) > 1000,
+      `${mgmt.json.value?.length ?? 0} base64 字符`);
+
+    mgmt = await request('POST', `/session/${sessionId}/appium/device/background_app`, { seconds: 1 });
+    check('宿主 backgroundApp', mgmt.status === 200, JSON.stringify(mgmt.json?.value?.error ?? ''));
+    const afterBg = await request('GET', `/session/${sessionId}/source`);
+    check('后台恢复后仍可交互', afterBg.status === 200 && String(afterBg.json.value).includes('AppiumAUT'));
+
     const removed = await request('DELETE', `/session/${sessionId}`);
     check('删除会话', removed.status === 200);
   } finally {

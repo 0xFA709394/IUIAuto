@@ -25,8 +25,11 @@
  *   POST /session/:id/timeouts[/implicit_wait]
  *   POST /session/:id/execute/sync（mobile: 命令）
  *   Appium 设备端点：shake / hide_keyboard / is_keyboard_shown / system_time /
- *     battery_info / clipboard / activate_app / query_app_state / alert / settings /
+ *     battery_info / clipboard / activate_app / terminate_app / background_app /
+ *     query_app_state / app_installed / install_app / remove_app / push_file /
+ *     pull_file / pull_folder / start-stop_recording_screen / alert / settings /
  *     performance_data
+ *     （App 生命周期 / 安装 / 文件 / 录屏走宿主 xcrun simctl —— 仅模拟器，见 iua_simctl.js）
  */
 
 import { createServer } from 'node:http';
@@ -35,11 +38,12 @@ import { pathToFileURL } from 'node:url';
 import { WebSocketServer } from 'ws';
 import { ensurePortFree, handleListenError, tryWakeApp } from './iua_ports.js';
 import { translateActions, ELEMENT_KEY, extractElementId } from './iua_webdriver_actions.js';
+import { createSimctl, looksLikeSimulatorModel } from './iua_simctl.js';
 
 const DEFAULT_BRIDGE_PORT = +(process.env.BRIDGE_PORT || 4723);
 const DEFAULT_APP_PORT = +(process.env.APP_PORT || 9800);
 const DEFAULT_BRIDGE_HOST = process.env.BRIDGE_HOST || '127.0.0.1';
-const AGENT_VERSION = '0.3.0';
+const AGENT_VERSION = '0.4.0';
 
 const SUPPORTED_LOCATORS = new Set([
   'accessibility id', 'id', 'identifier', 'name', 'label', 'text',
@@ -233,6 +237,7 @@ function sendError(res, error) {
  * @param {(msg:string)=>void} [options.log]
  * @param {number} [options.sessionWaitMs] 创建会话时等待 App 连接的最长时间
  * @param {Object} [options.capabilities] 额外能力（合并进 session capabilities）
+ * @param {Object} [options.simctl] 宿主侧设备管理（iua_simctl.js；缺省用真实 simctl）
  */
 export function createAppiumBridge(options = {}) {
   const {
@@ -241,6 +246,7 @@ export function createAppiumBridge(options = {}) {
     log = (...args) => console.log('[appium-bridge]', ...args),
     sessionWaitMs = 15000,
     capabilities: extraCapabilities = {},
+    simctl: simctlOption = null,
   } = options;
 
   if (typeof send !== 'function') {
@@ -272,6 +278,16 @@ export function createAppiumBridge(options = {}) {
     return null;
   }
 
+  /** 等 App 连接断开（hello 变空）。恒定在线的假 hello 超时后返回 false，调用方继续。 */
+  async function waitForAppDrop(timeoutMs) {
+    const start = Date.now();
+    while (Date.now() - start <= timeoutMs) {
+      if (!getHello()) return true;
+      await sleep(100);
+    }
+    return false;
+  }
+
   function requireSession(sessionId) {
     if (!session || session.id !== sessionId) {
       throw wdError('invalid session id', `会话不存在或已结束: ${sessionId}`, 404);
@@ -285,6 +301,165 @@ export function createAppiumBridge(options = {}) {
       throw wdError('stale element reference', '元素句柄已失效（页面可能已变化）', 404);
     }
     return record;
+  }
+
+  // ---- 宿主侧设备管理（simctl，仅模拟器）----
+
+  const simctlModule = simctlOption || createSimctl({
+    log: (...args) => log('[simctl]', ...args),
+  });
+
+  function deviceModelOf(currentSession) {
+    return currentSession.deviceInfo?.deviceModel ||
+      currentSession.hello?.environment?.deviceModel || '';
+  }
+
+  function isSimulatorSession(currentSession) {
+    const udid = String(currentSession.capabilities['appium:udid'] || '').trim();
+    // 显式给了 udid 视为用户确认走模拟器路径；否则按 App 上报的 machine 架构判定
+    return !!udid || looksLikeSimulatorModel(deviceModelOf(currentSession));
+  }
+
+  async function requireSimulatorUdid(currentSession) {
+    if (!isSimulatorSession(currentSession)) {
+      throw wdError('unsupported operation',
+        'App 运行在真机上：App 生命周期/安装/文件传输/录屏等宿主侧能力仅支持模拟器（可用 appium:udid 显式指定）', 500);
+    }
+    if (!currentSession.resolvedUdid) {
+      const hint = String(currentSession.capabilities['appium:udid'] || '').trim() || null;
+      currentSession.resolvedUdid = await simctlModule.resolveUdid(hint);
+    }
+    return currentSession.resolvedUdid;
+  }
+
+  /** iua_simctl 的 kind 错误 → WebDriver 错误 */
+  function simctlFailure(error) {
+    if (error?.webdriver) return error;
+    const message = error?.message || String(error);
+    switch (error?.kind) {
+      case 'not-found': return wdError('no such file', message, 404);
+      case 'invalid': return wdError('invalid argument', message, 400);
+      case 'no-recording': return wdError('unknown error', message, 404);
+      case 'busy': return wdError('unknown error', message, 500);
+      default: return wdError('unknown error', message, 500);
+    }
+  }
+
+  /** 会话/桥收尾：停掉还在跑的录屏（丢弃产物） */
+  async function cleanupRecording() {
+    try {
+      await simctlModule.stopRecording({ discard: true });
+    } catch { /* 没有进行中的录屏 */ }
+  }
+
+  const simctlCall = (promise) => promise.catch((error) => { throw simctlFailure(error); });
+
+  /**
+   * App 管理 / 文件传输 / 录屏的共用实现。
+   * mobile: 命令与 Appium 设备端点共用；模拟器走宿主 simctl，真机按语义降级或报不支持。
+   */
+  async function appManagement(currentSession, op, options = {}) {
+    // capabilities 里的 bundleId 可能为空（旧版 App 无法上报 device_info）：hello 环境兜底
+    const currentBundleId = String(currentSession.capabilities['appium:bundleId'] ||
+      currentSession.hello?.environment?.bundleId || '');
+
+    switch (op) {
+      case 'terminate': {
+        const bundleId = String(options.bundleId || options.appId || currentBundleId);
+        if (!bundleId) throw wdError('invalid argument', '缺少 bundleId/appId', 400);
+        const udid = await requireSimulatorUdid(currentSession);
+        const result = await simctlCall(simctlModule.terminateApp(udid, bundleId));
+        log(`terminateApp ${bundleId}: ${JSON.stringify(result)}`);
+        return true;
+      }
+      case 'activate': {
+        const bundleId = String(options.bundleId || options.appId || currentBundleId);
+        if (!bundleId) throw wdError('invalid argument', '缺少 bundleId/appId', 400);
+        // 真机上激活"当前 App"：App 本就在前台运行，视为成功
+        if (!isSimulatorSession(currentSession) && bundleId === currentBundleId) return true;
+        const udid = await requireSimulatorUdid(currentSession);
+        const { pid } = await simctlCall(simctlModule.launchApp(udid, bundleId));
+        log(`activateApp ${bundleId}: pid=${pid ?? '?'}`);
+        return true;
+      }
+      case 'background': {
+        const bundleId = String(options.bundleId || options.appId || currentBundleId);
+        if (!bundleId) throw wdError('invalid argument', '缺少 bundleId/appId', 400);
+        const seconds = Math.max(0, number(options.seconds ?? options.duration, 3));
+        const udid = await requireSimulatorUdid(currentSession);
+        await simctlCall(simctlModule.terminateApp(udid, bundleId));
+        if (seconds > 0) await sleep(Math.min(seconds, 300) * 1000);
+        await simctlCall(simctlModule.launchApp(udid, bundleId));
+        // 宿主 App 被切后台会断开 WS：先等断开事件把 hello 清掉，再等重连（不把等待变成失败）
+        if (bundleId === currentBundleId) {
+          await waitForAppDrop(2000);
+          await waitForApp(15000);
+        }
+        return null;
+      }
+      case 'state': {
+        const bundleId = String(options.bundleId || options.appId || '');
+        if (!bundleId || bundleId === currentBundleId) {
+          const data = await appSend('app_state');
+          return data?.state ?? 4;
+        }
+        if (!isSimulatorSession(currentSession)) return 0;
+        const udid = await requireSimulatorUdid(currentSession);
+        return simctlCall(simctlModule.appState(udid, bundleId));
+      }
+      case 'installed': {
+        const bundleId = String(options.bundleId || options.appId || '');
+        if (!bundleId || bundleId === currentBundleId) return true;
+        if (!isSimulatorSession(currentSession)) return false;
+        const udid = await requireSimulatorUdid(currentSession);
+        return simctlCall(simctlModule.isAppInstalled(udid, bundleId));
+      }
+      case 'install': {
+        const appPath = String(options.appPath || options.app || '');
+        if (!appPath) throw wdError('invalid argument', '缺少 appPath（宿主 .app 路径）', 400);
+        const udid = await requireSimulatorUdid(currentSession);
+        await simctlCall(simctlModule.installApp(udid, appPath));
+        return true;
+      }
+      case 'remove': {
+        const bundleId = String(options.appId || options.bundleId || '');
+        if (!bundleId) throw wdError('invalid argument', '缺少 appId/bundleId', 400);
+        const udid = await requireSimulatorUdid(currentSession);
+        return simctlCall(simctlModule.removeApp(udid, bundleId));
+      }
+      case 'push': {
+        const path = String(options.path || '');
+        const payload = options.payload ?? options.data ?? options.content;
+        if (!path || typeof payload !== 'string') {
+          throw wdError('invalid argument', '缺少 path 或 payload（base64 文本）', 400);
+        }
+        const udid = await requireSimulatorUdid(currentSession);
+        await simctlCall(simctlModule.pushFile(udid, path, payload));
+        return null;
+      }
+      case 'pull': {
+        const path = String(options.path || '');
+        if (!path) throw wdError('invalid argument', '缺少 path', 400);
+        const udid = await requireSimulatorUdid(currentSession);
+        return simctlCall(simctlModule.pullFile(udid, path));
+      }
+      case 'pullFolder': {
+        const path = String(options.folderPath || options.path || '');
+        if (!path) throw wdError('invalid argument', '缺少 folderPath', 400);
+        const udid = await requireSimulatorUdid(currentSession);
+        return simctlCall(simctlModule.pullFolder(udid, path));
+      }
+      case 'startRecording': {
+        const udid = await requireSimulatorUdid(currentSession);
+        await simctlCall(simctlModule.startRecording(udid));
+        return null;
+      }
+      case 'stopRecording': {
+        return simctlCall(simctlModule.stopRecording());
+      }
+      default:
+        throw wdError('unknown command', `未实现的设备管理操作: ${op}`, 404);
+    }
   }
 
   async function findElements(currentSession, using, value) {
@@ -832,18 +1007,49 @@ export function createAppiumBridge(options = {}) {
         return { level: data?.batteryLevel, state: data?.batteryState ?? 'unknown' };
       }
       case 'queryappstate': {
+        if (options.bundleId || options.appId) {
+          return appManagement(currentSession, 'state', options);
+        }
         const data = await appSend('app_state');
         return data?.state ?? 4;
       }
       case 'activateapp': {
-        const bundleId = options.bundleId || options.appId || currentSession.capabilities['appium:bundleId'];
-        if (bundleId === currentSession.capabilities['appium:bundleId']) return null;
-        throw wdError('unsupported operation', `无法激活其他 App（仅支持当前宿主 App）: ${bundleId}`, 500);
+        await appManagement(currentSession, 'activate', options);
+        return true;
       }
-      case 'terminateapp':
-      case 'backgroundapp':
-        throw wdError('unsupported operation',
-          'IUIAuto 为进程内 Agent，不支持 terminateApp/backgroundApp（可用 simctl 在宿主侧操作）', 500);
+      case 'terminateapp': {
+        await appManagement(currentSession, 'terminate', options);
+        return true;
+      }
+      case 'backgroundapp': {
+        return appManagement(currentSession, 'background', options);
+      }
+      case 'isappinstalled': {
+        return appManagement(currentSession, 'installed', options);
+      }
+      case 'installapp': {
+        await appManagement(currentSession, 'install', options);
+        return true;
+      }
+      case 'removeapp': {
+        return appManagement(currentSession, 'remove', options);
+      }
+      case 'pushfile': {
+        await appManagement(currentSession, 'push', options);
+        return null;
+      }
+      case 'pullfile': {
+        return appManagement(currentSession, 'pull', options);
+      }
+      case 'pullfolder': {
+        return appManagement(currentSession, 'pullFolder', options);
+      }
+      case 'startrecordingscreen': {
+        return appManagement(currentSession, 'startRecording', options);
+      }
+      case 'stoprecordingscreen': {
+        return appManagement(currentSession, 'stopRecording', options);
+      }
       case 'lock':
       case 'unlock':
       case 'islocked':
@@ -864,6 +1070,7 @@ export function createAppiumBridge(options = {}) {
     if (method === 'DELETE' && rest.length === 0) {
       const ended = currentSession.id;
       session = null;
+      await cleanupRecording();
       log(`session ${ended} deleted`);
       return sendJSON(res, { value: null });
     }
@@ -1050,44 +1257,62 @@ export function createAppiumBridge(options = {}) {
     }
     if (method === 'POST' && key === 'appium/device/activate_app') {
       const body = await readJSON(req);
-      const bundleId = body.bundleId || body.appId || '';
-      if (bundleId && bundleId !== currentSession.capabilities['appium:bundleId']) {
-        throw wdError('unsupported operation', `无法激活其他 App（仅支持当前宿主 App）: ${bundleId}`, 500);
-      }
+      await appManagement(currentSession, 'activate', body);
       return sendJSON(res, { value: null });
     }
     if (method === 'POST' &&
         (key === 'appium/device/app_state' || key === 'appium/device/query_app_state')) {
       const body = await readJSON(req);
-      const bundleId = body.bundleId || body.appId || '';
-      if (bundleId && bundleId !== currentSession.capabilities['appium:bundleId']) {
-        return sendJSON(res, { value: 0 });
-      }
-      const data = await appSend('app_state');
-      return sendJSON(res, { value: data?.state ?? 4 });
+      const value = await appManagement(currentSession, 'state', body);
+      return sendJSON(res, { value });
     }
     if (method === 'POST' && key === 'appium/device/app_installed') {
       const body = await readJSON(req);
-      const bundleId = body.bundleId || body.appId || '';
-      return sendJSON(res, { value: !bundleId || bundleId === currentSession.capabilities['appium:bundleId'] });
+      const value = await appManagement(currentSession, 'installed', body);
+      return sendJSON(res, { value });
     }
-    if (method === 'POST' && (key === 'appium/device/terminate_app' ||
-        key === 'appium/device/background_app')) {
-      throw wdError('unsupported operation',
-        'IUIAuto 为进程内 Agent，不支持 terminateApp/backgroundApp（可用 simctl 在宿主侧操作）', 500);
+    if (method === 'POST' && key === 'appium/device/terminate_app') {
+      const body = await readJSON(req);
+      await appManagement(currentSession, 'terminate', body);
+      return sendJSON(res, { value: null });
     }
-    if (method === 'POST' && (key === 'appium/device/install_app' ||
-        key === 'appium/device/remove_app' ||
-        key === 'appium/device/push_file' ||
-        key === 'appium/device/pull_file' ||
-        key === 'appium/device/pull_folder')) {
-      throw wdError('unsupported operation',
-        'IUIAuto 为进程内 Agent，不支持 App 安装/文件传输（请在宿主侧使用 simctl 或 Xcode）', 500);
+    if (method === 'POST' && key === 'appium/device/background_app') {
+      const body = await readJSON(req);
+      await appManagement(currentSession, 'background', body);
+      return sendJSON(res, { value: null });
     }
-    if (method === 'POST' && (key === 'appium/start_recording_screen' ||
-        key === 'appium/stop_recording_screen')) {
-      throw wdError('unsupported operation',
-        'IUIAuto 暂不支持屏幕录制；可在宿主侧使用 xcrun simctl io recordVideo', 500);
+    if (method === 'POST' && key === 'appium/device/install_app') {
+      const body = await readJSON(req);
+      await appManagement(currentSession, 'install', body);
+      return sendJSON(res, { value: null });
+    }
+    if (method === 'POST' && key === 'appium/device/remove_app') {
+      const body = await readJSON(req);
+      const value = await appManagement(currentSession, 'remove', body);
+      return sendJSON(res, { value });
+    }
+    if (method === 'POST' && key === 'appium/device/push_file') {
+      const body = await readJSON(req);
+      await appManagement(currentSession, 'push', body);
+      return sendJSON(res, { value: null });
+    }
+    if (method === 'POST' && key === 'appium/device/pull_file') {
+      const body = await readJSON(req);
+      const value = await appManagement(currentSession, 'pull', body);
+      return sendJSON(res, { value });
+    }
+    if (method === 'POST' && key === 'appium/device/pull_folder') {
+      const body = await readJSON(req);
+      const value = await appManagement(currentSession, 'pullFolder', body);
+      return sendJSON(res, { value });
+    }
+    if (method === 'POST' && key === 'appium/start_recording_screen') {
+      await appManagement(currentSession, 'startRecording');
+      return sendJSON(res, { value: null });
+    }
+    if (method === 'POST' && key === 'appium/stop_recording_screen') {
+      const value = await appManagement(currentSession, 'stopRecording');
+      return sendJSON(res, { value });
     }
     if (method === 'POST' && (key === 'appium/device/lock' ||
         key === 'appium/device/unlock' || key === 'appium/device/is_locked')) {
@@ -1244,10 +1469,13 @@ export function createAppiumBridge(options = {}) {
     get session() { return session; },
     handleRequest,
     close() {
-      return new Promise((resolve) => {
-        try { server.closeAllConnections?.(); } catch { /* ignore */ }
-        server.close(() => resolve());
-      });
+      return (async () => {
+        await cleanupRecording();
+        await new Promise((resolve) => {
+          try { server.closeAllConnections?.(); } catch { /* ignore */ }
+          server.close(() => resolve());
+        });
+      })();
     },
   };
 }
