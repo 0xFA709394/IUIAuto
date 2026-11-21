@@ -50,6 +50,9 @@ node appium_bridge.js --takeover
 
 `POST /session` 返回的 capabilities 还会包含 `appium:platformVersion`、`appium:deviceModel`、
 `appium:appVersion`、`appium:elementStrategies` 等。`appium:automationName` 固定回写为 `IUIAuto`。
+`appium:orientation`（`PORTRAIT`/`LANDSCAPE`）建会话时即生效（尽力而为，失败不阻塞）。
+`appium:forceAppLaunch: true` 建会话时重启宿主 App（阻塞至重连完成）；`appium:newCommandTimeout`
+（秒，默认 300）空闲自动结束会话（触发 `unexpectedShutdown` 事件，0 = 禁用）。
 
 > `appium:udid`（或环境变量 `IUA_UDID`）：指定目标模拟器。宿主侧设备管理（App 生命周期/
 > 安装/文件/录屏）只在模拟器上可用；未显式指定 udid 时按 App 上报的机型自动判断，
@@ -176,6 +179,9 @@ curl -s -X POST http://127.0.0.1:4723/session/<SID>/element \
 | GET | `/session/:id/element/:eid/screenshot` | 元素截图（base64） |
 | GET | `/session/:id/element/:eid/attribute/:name` | 属性 |
 | GET | `/session/:id/element/:eid/property/:name` | 属性（同 attribute） |
+| GET | `/session/:id/element/:eid/location` / `location_in_view` | 左上角坐标（JSON Wire 兼容） |
+| GET | `/session/:id/element/:eid/size` | 尺寸（JSON Wire 兼容） |
+| GET | `/session/:id/element/:eid/equals/:other` | 两句柄是否同一元素（JSON Wire 兼容） |
 
 ### 页面 / 手势 / 会话配置
 
@@ -185,6 +191,9 @@ curl -s -X POST http://127.0.0.1:4723/session/<SID>/element \
 | GET | `/session/:id/screenshot` | 窗口截图（base64） |
 | POST | `/session/:id/actions` | W3C Actions（单指/双指/键盘） |
 | DELETE | `/session/:id/actions` | 释放手势（no-op） |
+| POST | `/session/:id/keys` | 对焦点输入文本（JSON Wire 兼容，支持 `\uE00x` 特殊键） |
+| POST | `/session/:id/touch/perform` | Appium TouchAction 单指链（tap/press/longPress/moveTo/wait/release） |
+| POST | `/session/:id/touch/multi/perform` | Appium TouchAction 多指链（两指自动合成 pinch/双指滑动） |
 | POST | `/session/:id/timeouts` | 隐式/页面/脚本超时 |
 | POST | `/session/:id/timeouts/implicit_wait` | 隐式等待 |
 | GET | `/session/:id/window/rect` | 窗口尺寸 |
@@ -224,7 +233,9 @@ curl -s -X POST http://127.0.0.1:4723/session/<SID>/element \
 | GET/POST | `/session/:id/alert/text` | W3C 标准弹窗文本/设置文本 |
 | POST | `/session/:id/appium/alert/accept|dismiss` | Appium 别名（同上） |
 | GET/POST | `/session/:id/appium/alert/text` | Appium 别名（同上） |
-| GET/POST | `/session/:id/appium/settings` | Appium settings 存储 |
+| GET/POST | `/session/:id/appium/settings` | Appium settings（`screenshotQuality` 0/1/2 对窗口/元素截图实时生效） |
+| GET/POST | `/session/:id/appium/events` | Appium Events API（事件名→时间戳数组；POST 按 `events` 名称过滤） |
+| GET | `/events` | 服务器级事件（serverStarted / sessionRequested/Started/Deleted / commandError / unexpectedShutdown） |
 | POST | `/session/:id/appium/performance_data` | App 内性能单点采样 |
 
 ---
@@ -251,13 +262,16 @@ curl -s -X POST http://127.0.0.1:4723/session/<SID>/element \
 | 命令 | 主要参数 |
 |---|---|
 | `mobile: tap` / `doubleTap` / `touchAndHold` | `element` 或 `x,y`、`duration` |
-| `mobile: swipe` / `scroll` | `element?`、`direction`、`distance` |
+| `mobile: swipe` / `scroll` | `element?`、`direction`、`distance`；scroll 另支持 XCUITest 语义：`name`/`predicateString`/`toVisible` 循环滚动直到目标可见（返回元素句柄，`direction` 为滚动方向，与 swipe 的手指方向相反） |
 | `mobile: pinch` | `element?`、`scale` |
 | `mobile: dragFromToForDuration` | `fromX,fromY,toX,toY,duration`（元素内相对坐标） |
 | `mobile: scrollToElement` / `scrollToVisible` | `element` |
 | `mobile: scrollToTop` / `scrollToBottom` | `element?`（缺省取首个 UIScrollView） |
 | `mobile: alert` | `action: accept/dismiss/getText/setText`、`text` |
 | `mobile: getPasteboard` / `setPasteboard` / `deletePasteboard` | `text` |
+| `mobile: getClipboard` / `setClipboard` / `clearClipboard` | Appium 官方剪贴板命令名（同 pasteboard） |
+| `mobile: setPermission` / `resetPermission` | `service`（simctl 服务名）、`state: granted/denied/reset`、`bundleId?`；权限变更可能杀掉运行中的 App（当前 App 会自动等重连） |
+| `mobile: getAppStrings` | `language?`、`bundleId?` → `{language, strings}`（读 App bundle 的 Localizable.strings，宿主侧 plutil 解析） |
 | `mobile: activeElement` / `source` / `deviceInfo` / `keyboardShown` | — |
 | `mobile: orientation` / `setOrientation` | `orientation` |
 | `mobile: viewportScreenshot` | — |
@@ -267,14 +281,24 @@ curl -s -X POST http://127.0.0.1:4723/session/<SID>/element \
 | `mobile: installApp` / `removeApp` / `isAppInstalled` | `app`（宿主 .app 路径）、`appId`、`bundleId` |
 | `mobile: pushFile` / `pullFile` / `pullFolder` | `path`、`payload|data` |
 | `mobile: startRecordingScreen` / `stopRecordingScreen` | —（停止返回 base64 mp4） |
+| `mobile: setAppearance` / `getAppearance` | `style: light/dark`（宿主 simctl，仅模拟器） |
+| `mobile: compareImages` | `firstImage`（基线 PNG base64）、`options.threshold`（0~1 相似度阈值自动换算为差异百分比，>=1 视为百分比）；返回 `{pass, diffPercent, …}`（App images 插件同名命令） |
+| `mobile: hideKeyboard` | `key?`（给 key 时用按键收起，如 `return`） |
+| `mobile: keys` | `keys: [...]`（逐键输入，支持 `\uE00x` 特殊键） |
 | `mobile: shake` | — |
 
 **明确不支持**（进程内 Agent 的边界）：
-`lock`/`unlock`/`isLocked`、`pressKeyCode`（Android）、`startActivity`（Android）。
-App 管理 / 文件 / 录屏已通过宿主 `xcrun simctl` 支持（见下节，仅模拟器）。
+`lock`/`unlock`/`isLocked`、`pressKeyCode`（Android）、`startActivity`（Android）、
+`enrollBiometrics`/`sendBiometricMatch`（本机 Xcode 无 `simctl biometry`）、
+`clearKeychains`（本机 `simctl privacy` 无 keychain 服务）。
+App 管理 / 文件 / 录屏 / 权限 / 外观已通过宿主 `xcrun simctl` 支持（见下节，仅模拟器）。
 
 > `mobile: tap`/`doubleTap`/`touchAndHold` 在同时提供 `element` 时，`x`/`y` 按“相对元素左上角”处理；
 > `mobile: dragFromToForDuration` 的四个坐标同样按元素相对坐标平移。
+>
+> JSON Wire `touch/perform`（TouchAction）坐标语义与 Appium 一致：无 `element` 为绝对坐标，
+> 带 `element` 时 `x`/`y` 相对元素左上角（缺省取元素中心）；链会被翻译为 tap/double tap/
+> long press/swipe/pinch 语义手势。
 
 ---
 
@@ -291,6 +315,9 @@ App 管理 / 文件 / 录屏已通过宿主 `xcrun simctl` 支持（见下节，
 | `isAppInstalled` / `installApp` / `removeApp` | `listapps` / `install` / `uninstall` |
 | `pushFile` / `pullFile` / `pullFolder` | `@bundleId/相对路径` → App 数据容器；或绝对路径；pullFolder 返回 zip base64 |
 | `startRecordingScreen` / `stopRecordingScreen` | `simctl io recordVideo`；同一会话一路；stop 返回 mp4 base64；会话结束自动收尾 |
+| `mobile: setAppearance` / `getAppearance` | `simctl ui appearance light/dark`（Appium 外观命令） |
+| `mobile: setPermission` / `resetPermission` | `simctl privacy grant/revoke/reset`（服务名与 XCUITest 一致；本机无 `camera`/keychain 服务） |
+| `mobile: getAppStrings` | `simctl get_app_container … app` + plutil 解析 Localizable.strings |
 
 约束：
 

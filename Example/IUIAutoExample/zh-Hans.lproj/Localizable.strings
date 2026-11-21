@@ -1,0 +1,6 @@
+/* IUIAutoExample 本地化演示串（Appium mobile: getAppStrings 的真实数据源） */
+"demo.greeting" = "你好，IUIAuto";
+"demo.counter.button" = "点我计数";
+"demo.input.placeholder" = "请输入内容";
+"demo.submit.button" = "提交";
+"demo.alert.title" = "提示";

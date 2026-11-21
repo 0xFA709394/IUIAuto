@@ -259,9 +259,102 @@ async function main() {
     check('mobile: deviceInfo', deviceInfo.status === 200 && deviceInfo.json.value.bundleId === BUNDLE_ID,
       deviceInfo.json.value?.bundleId ?? '');
 
+    // ---- JSON Wire 兼容 / 外观 / settings ----
+    let mgmt = await request('GET', `/session/${sessionId}/element/${button}/location`);
+    check('JSON Wire element location', mgmt.status === 200 && mgmt.json.value.x >= 0,
+      JSON.stringify(mgmt.json.value));
+    const elemSize = await request('GET', `/session/${sessionId}/element/${button}/size`);
+    check('JSON Wire element size', elemSize.status === 200 && elemSize.json.value.width > 0,
+      JSON.stringify(elemSize.json.value));
+    const liveRect = (await request('GET', `/session/${sessionId}/element/${button}/rect`)).json.value;
+    const beforeTouch = parseInt(String((await request('GET', `/session/${sessionId}/element/${label}/text`)).json.value).replace(/\D+/g, ''), 10) || 0;
+    mgmt = await request('POST', `/session/${sessionId}/touch/perform`, {
+      actions: [{
+        action: 'tap',
+        options: { x: liveRect.x + liveRect.width / 2, y: liveRect.y + liveRect.height / 2 },
+      }],
+    });
+    await sleep(250);
+    const afterTouch = parseInt(String((await request('GET', `/session/${sessionId}/element/${label}/text`)).json.value).replace(/\D+/g, ''), 10) || 0;
+    check('JSON Wire touch/perform tap 生效', mgmt.status === 200 && afterTouch === beforeTouch + 1,
+      `${beforeTouch} → ${afterTouch}`);
+
+    mgmt = await request('POST', `/session/${sessionId}/execute/sync`, { script: 'mobile: setAppearance', args: [{ style: 'dark' }] });
+    check('mobile: setAppearance', mgmt.status === 200 && mgmt.json.value.style === 'dark',
+      JSON.stringify(mgmt.json.value));
+    mgmt = await request('POST', `/session/${sessionId}/execute/sync`, { script: 'mobile: getAppearance', args: [] });
+    check('mobile: getAppearance', mgmt.status === 200 && mgmt.json.value.style === 'dark',
+      JSON.stringify(mgmt.json.value));
+    await request('POST', `/session/${sessionId}/execute/sync`, { script: 'mobile: setAppearance', args: [{ style: 'light' }] });
+
+    const settingsSet = await request('POST', `/session/${sessionId}/appium/settings`, { settings: { screenshotQuality: 1 } });
+    const settingsGet = await request('GET', `/session/${sessionId}/appium/settings`);
+    check('appium settings screenshotQuality', settingsSet.status === 200 &&
+      settingsGet.json.value.screenshotQuality === 1);
+    const settingsShot = await request('GET', `/session/${sessionId}/screenshot`);
+    check('screenshotQuality=1 截图仍可用', settingsShot.status === 200 && settingsShot.json.value.length > 1000);
+    // 恢复默认，避免后续 compareImages 基线与 App 内截图尺寸不一致
+    await request('POST', `/session/${sessionId}/appium/settings`, { settings: { screenshotQuality: 2 } });
+
+    // ---- mobile: scroll XCUITest 语义 / compareImages / events ----
+    if (demoScroll) {
+      const toBottom = await request('POST', `/session/${sessionId}/execute/sync`, {
+        script: 'mobile: scrollToBottom', args: [{ element: { ELEMENT: demoScroll } }],
+      });
+      check('预置：滚动到底部', toBottom.status === 200);
+      await sleep(400);
+      const scrollBack = await request('POST', `/session/${sessionId}/execute/sync`, {
+        script: 'mobile: scroll',
+        args: [{ name: 'field.input', direction: 'up' }],
+      });
+      check('mobile: scroll(name) 滚回目标并返回句柄', scrollBack.status === 200 &&
+        !!scrollBack.json.value?.['element-6066-11e4-a52e-4f735466cecf'],
+        JSON.stringify(scrollBack.json?.value?.error ?? ''));
+    } else {
+      check('mobile: scroll(name) 滚回目标并返回句柄', false, 'scroll.demo 不存在');
+    }
+
+    const shotBase = (await request('GET', `/session/${sessionId}/screenshot`)).json.value;
+    const compare = await request('POST', `/session/${sessionId}/execute/sync`, {
+      script: 'mobile: compareImages', args: [{ firstImage: shotBase }],
+    });
+    check('mobile: compareImages 同屏对比', compare.status === 200 && compare.json.value.pass === true,
+      `diff=${compare.json.value?.diffPercent}%`);
+
+    const events = await request('GET', `/session/${sessionId}/appium/events`);
+    check('Appium events API', events.status === 200 &&
+      (events.json.value?.events?.sessionStarted?.length ?? 0) >= 1);
+
+    // ---- 权限 / App 字符串 / 剪贴板 ----
+    // 权限变更可能杀掉运行中的 App：显式带 bundleId，桥会自动等重连
+    mgmt = await request('POST', `/session/${sessionId}/execute/sync`, {
+      script: 'mobile: setPermission', args: [{ service: 'photos', state: 'granted', bundleId: BUNDLE_ID }],
+    });
+    check('mobile: setPermission grant', mgmt.status === 200, JSON.stringify(mgmt.json?.value?.error ?? ''));
+    await sleep(500);
+    mgmt = await request('POST', `/session/${sessionId}/execute/sync`, {
+      script: 'mobile: resetPermission', args: [{ service: 'photos', bundleId: BUNDLE_ID }],
+    });
+    check('mobile: resetPermission', mgmt.status === 200, JSON.stringify(mgmt.json?.value?.error ?? ''));
+    await sleep(500);
+
+    const strings = await request('POST', `/session/${sessionId}/execute/sync`, {
+      script: 'mobile: getAppStrings', args: [{ language: 'zh-Hans' }],
+    });
+    check('mobile: getAppStrings', strings.status === 200 &&
+      strings.json.value?.strings?.['demo.greeting'] === '你好，IUIAuto',
+      strings.json.value?.language ?? JSON.stringify(strings.json?.value?.error ?? ''));
+
+    const clipSet = await request('POST', `/session/${sessionId}/execute/sync`, {
+      script: 'mobile: setClipboard', args: [{ content: 'appium clipboard' }],
+    });
+    const clipGet = await request('POST', `/session/${sessionId}/execute/sync`, { script: 'mobile: getClipboard', args: [] });
+    check('mobile: setClipboard/getClipboard', clipSet.status === 200 &&
+      clipGet.json.value === 'appium clipboard', `${clipGet.json.value}`);
+
     // ---- 宿主侧设备管理（simctl）----
     const pushPayload = Buffer.from('e2e push file 你好').toString('base64');
-    let mgmt = await request('POST', `/session/${sessionId}/appium/device/push_file`, {
+    mgmt = await request('POST', `/session/${sessionId}/appium/device/push_file`, {
       path: `@${BUNDLE_ID}/Documents/e2e.txt`, payload: pushPayload,
     });
     check('宿主 push_file', mgmt.status === 200, JSON.stringify(mgmt.json?.value?.error ?? ''));
@@ -291,6 +384,9 @@ async function main() {
 
     const removed = await request('DELETE', `/session/${sessionId}`);
     check('删除会话', removed.status === 200);
+  } catch (error) {
+    // finally 里的 process.exit 会吞掉未处理的 rejection，必须在此打印失败原因
+    console.error('E2E 失败:', error.stack || error.message);
   } finally {
     if (!keep) {
       if (child.exitCode === null) {

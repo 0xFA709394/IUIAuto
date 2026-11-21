@@ -147,6 +147,29 @@ async function buildPointerTrack(source, resolveElementRect) {
   return null;
 }
 
+/** 任意文本（含 WebDriver 特殊键 \uE00x）→ press_key 指令序列；供 W3C Actions、/keys、mobile: keys 复用 */
+export function textToKeyCommands(text) {
+  const commands = [];
+  const value = String(text ?? '');
+  if (MODIFIER_KEYS.has(value)) return commands;
+  if (SPECIAL_KEYS[value]) {
+    commands.push({ action: 'press_key', params: { key: SPECIAL_KEYS[value] } });
+    return commands;
+  }
+  for (const char of Array.from(value)) {
+    if (SPECIAL_KEYS[char]) {
+      commands.push({ action: 'press_key', params: { key: SPECIAL_KEYS[char] } });
+    } else if (char === '\n' || char === '\r') {
+      commands.push({ action: 'press_key', params: { key: 'return' } });
+    } else if (char === '\b') {
+      commands.push({ action: 'press_key', params: { key: 'delete' } });
+    } else {
+      commands.push({ action: 'press_key', params: { key: char } });
+    }
+  }
+  return commands;
+}
+
 function buildKeyCommands(source) {
   const commands = [];
   for (const action of source.actions || []) {
@@ -154,20 +177,11 @@ function buildKeyCommands(source) {
     const raw = action.value;
     if (raw == null) continue;
     const text = String(raw);
-    if (MODIFIER_KEYS.has(text)) continue;
     if (SPECIAL_KEYS[text]) {
       commands.push({ action: 'press_key', params: { key: SPECIAL_KEYS[text] } });
       continue;
     }
-    for (const char of Array.from(text)) {
-      if (char === '\n' || char === '\r') {
-        commands.push({ action: 'press_key', params: { key: 'return' } });
-      } else if (char === '\b') {
-        commands.push({ action: 'press_key', params: { key: 'delete' } });
-      } else {
-        commands.push({ action: 'press_key', params: { key: char } });
-      }
-    }
+    commands.push(...textToKeyCommands(text));
   }
   return commands;
 }

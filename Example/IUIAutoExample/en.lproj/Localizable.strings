@@ -1,0 +1,6 @@
+/* IUIAutoExample localization demo strings (real data source for Appium mobile: getAppStrings) */
+"demo.greeting" = "Hello, IUIAuto";
+"demo.counter.button" = "Tap to Count";
+"demo.input.placeholder" = "Type something";
+"demo.submit.button" = "Submit";
+"demo.alert.title" = "Notice";

@@ -15,7 +15,7 @@
 
 import { execFile, spawn } from 'node:child_process';
 import { promisify } from 'node:util';
-import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -136,6 +136,91 @@ export function createSimctl({ run = defaultRun, spawnVideo = defaultSpawnVideo,
   /** 1=未运行 3=后台运行；前台判定（4）由桥结合当前宿主 App 给出 */
   async function appState(udid, bundleId) {
     return (await isProcessRunning(udid, bundleId)) ? 3 : 1;
+  }
+
+  // ---- 外观（Appium mobile: setAppearance / getAppearance）----
+
+  async function getAppearance(udid) {
+    const stdout = String(await simctl(['ui', udid, 'appearance'], 20)).trim().toLowerCase();
+    if (stdout === 'light' || stdout === 'dark') return stdout;
+    throw fail('device', `模拟器不支持外观读取/设置: ${stdout || '无输出'}`);
+  }
+
+  async function setAppearance(udid, style) {
+    const value = String(style || '').toLowerCase();
+    if (value !== 'light' && value !== 'dark') {
+      throw fail('invalid', 'appearance 必须为 light 或 dark');
+    }
+    await simctl(['ui', udid, 'appearance', value], 20);
+    return getAppearance(udid);
+  }
+
+  // ---- 权限（Appium mobile: setPermission / resetPermission，服务名与 simctl/XCUITest 一致）----
+
+  const PRIVACY_SERVICES = new Set([
+    'all', 'calendar', 'contacts-limited', 'contacts', 'location', 'location-always',
+    'photos-add', 'photos', 'media-library', 'microphone', 'motion', 'reminders', 'siri',
+  ]);
+
+  function privacyService(service) {
+    const value = String(service || 'all').trim();
+    if (!PRIVACY_SERVICES.has(value)) {
+      throw fail('invalid', `不支持的权限服务: ${value}（支持: ${[...PRIVACY_SERVICES].join(' / ')}）`);
+    }
+    return value;
+  }
+
+  async function grantService(udid, bundleId, service) {
+    await simctl(['privacy', udid, 'grant', privacyService(service), bundleId], 20);
+    return true;
+  }
+
+  async function revokeService(udid, bundleId, service) {
+    await simctl(['privacy', udid, 'revoke', privacyService(service), bundleId], 20);
+    return true;
+  }
+
+  async function resetService(udid, service, bundleId) {
+    const args = ['privacy', udid, 'reset', privacyService(service)];
+    if (bundleId) args.push(bundleId);
+    await simctl(args, 20);
+    return true;
+  }
+
+  // ---- App 本地化字符串（Appium mobile: getAppStrings）----
+
+  /** 读取 App bundle 内 .lproj/Localizable.strings，返回 {key: value}；无资源返回 {} */
+  async function appStrings(udid, bundleId, language = null) {
+    const bundlePath = String(await simctl(['get_app_container', udid, bundleId, 'app'], 20)).trim();
+    if (!bundlePath || !existsSync(bundlePath)) {
+      throw fail('device', `无法定位 App 安装目录: ${bundleId}`);
+    }
+    const lprojs = readdirSync(bundlePath).filter((name) => name.endsWith('.lproj'));
+    const wanted = language ? String(language).trim() : null;
+    let candidates = [];
+    if (wanted) {
+      // 先精确（zh-Hans），再退化到主语言（zh）
+      candidates = lprojs.filter((n) => n === `${wanted}.lproj` || n.startsWith(`${wanted.split('-')[0]}-`) || n === `${wanted.split('-')[0]}.lproj`);
+    } else {
+      candidates = lprojs;
+    }
+    // 找不到指定语言时回退到任意一个（Base/en 优先）
+    if (candidates.length === 0 && wanted) candidates = lprojs.filter((n) => /^(en|Base)\.lproj$/.test(n));
+    if (candidates.length === 0) candidates = lprojs;
+    for (const lproj of candidates) {
+      const file = join(bundlePath, lproj, 'Localizable.strings');
+      if (!existsSync(file)) continue;
+      const { stdout } = await execFileAsync('plutil', ['-convert', 'json', '-o', '-', file]);
+      try {
+        const map = JSON.parse(stdout || '{}');
+        if (map && typeof map === 'object') {
+          return { language: lproj.replace(/\.lproj$/, ''), strings: map };
+        }
+      } catch {
+        throw fail('device', `Localizable.strings 解析失败: ${lproj}`);
+      }
+    }
+    return { language: null, strings: {} };
   }
 
   // ---- 安装管理 ----
@@ -286,6 +371,12 @@ export function createSimctl({ run = defaultRun, spawnVideo = defaultSpawnVideo,
     launchApp,
     terminateApp,
     appState,
+    getAppearance,
+    setAppearance,
+    grantService,
+    revokeService,
+    resetService,
+    appStrings,
     isProcessRunning,
     isAppInstalled,
     installApp,

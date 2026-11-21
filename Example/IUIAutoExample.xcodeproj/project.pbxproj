@@ -7,31 +7,34 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		0D862395C138153316E81A81 /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = ACDB979F9E1842C88FA416CD /* Localizable.strings */; };
 		1D1FE8CB2D90F0DF843DCF8C /* DemoViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 0398DDD708A75BF88252197B /* DemoViewController.m */; };
+		3B913BEBC4AC30A7FDE2675D /* Pods_IUIAutoExample.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3C51EFBA00E4F2DBF6690EEF /* Pods_IUIAutoExample.framework */; };
 		45BDB2CD5E7342E16BFCCD75 /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = 3B30962B4AF37C70CC088609 /* main.m */; };
-		9D79B98E19385A23693474A4 /* Pods_IUIAutoExample.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 57E452A1AEC988EF3DB6E197 /* Pods_IUIAutoExample.framework */; };
 		FBDEED70280D92DFD88C2E03 /* AppDelegate.m in Sources */ = {isa = PBXBuildFile; fileRef = 2B732E36F3AB261481FA4334 /* AppDelegate.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		021B976E9C6863BD26DAEF3B /* AppDelegate.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AppDelegate.h; sourceTree = "<group>"; };
 		0398DDD708A75BF88252197B /* DemoViewController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = DemoViewController.m; sourceTree = "<group>"; };
-		0DF54B682482738395FFBAA4 /* Pods-IUIAutoExample.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-IUIAutoExample.release.xcconfig"; path = "Target Support Files/Pods-IUIAutoExample/Pods-IUIAutoExample.release.xcconfig"; sourceTree = "<group>"; };
+		1E8711A499511FF2BC13FEE7 /* Pods-IUIAutoExample.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-IUIAutoExample.debug.xcconfig"; path = "Target Support Files/Pods-IUIAutoExample/Pods-IUIAutoExample.debug.xcconfig"; sourceTree = "<group>"; };
+		2A3954BF88F3230E8708E0C0 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/Localizable.strings"; sourceTree = "<group>"; };
 		2B732E36F3AB261481FA4334 /* AppDelegate.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = AppDelegate.m; sourceTree = "<group>"; };
 		3B30962B4AF37C70CC088609 /* main.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
-		3FC5FBC9C1523ED33704BA61 /* Pods-IUIAutoExample.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-IUIAutoExample.debug.xcconfig"; path = "Target Support Files/Pods-IUIAutoExample/Pods-IUIAutoExample.debug.xcconfig"; sourceTree = "<group>"; };
-		57E452A1AEC988EF3DB6E197 /* Pods_IUIAutoExample.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_IUIAutoExample.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		3C51EFBA00E4F2DBF6690EEF /* Pods_IUIAutoExample.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_IUIAutoExample.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		59A6D9D266FC0B7BEFB8257B /* Pods-IUIAutoExample.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-IUIAutoExample.release.xcconfig"; path = "Target Support Files/Pods-IUIAutoExample/Pods-IUIAutoExample.release.xcconfig"; sourceTree = "<group>"; };
+		72D0FF80E62A6383AF98E54C /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/Localizable.strings; sourceTree = "<group>"; };
 		7F766213A5150725C961B185 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		957678620D448F8041E75871 /* IUIAutoExample.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = IUIAutoExample.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		FDC4CCD8D3C9324A5E04070F /* DemoViewController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = DemoViewController.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
-		3FAD965590D87842989681D7 /* Frameworks */ = {
+		6C1FCFE24F6E7C7778EC2128 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				9D79B98E19385A23693474A4 /* Pods_IUIAutoExample.framework in Frameworks */,
+				3B913BEBC4AC30A7FDE2675D /* Pods_IUIAutoExample.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -55,6 +58,7 @@
 				0398DDD708A75BF88252197B /* DemoViewController.m */,
 				7F766213A5150725C961B185 /* Info.plist */,
 				3B30962B4AF37C70CC088609 /* main.m */,
+				ACDB979F9E1842C88FA416CD /* Localizable.strings */,
 			);
 			path = IUIAutoExample;
 			sourceTree = "<group>";
@@ -64,27 +68,27 @@
 			children = (
 				18268AE3E6B1947ADC0E740E /* IUIAutoExample */,
 				087344965CE058177183757D /* Products */,
-				5902E51B14B702079F52B8C2 /* Pods */,
-				53CBA97A59CEA6607BD0701C /* Frameworks */,
+				796AF63A203DC5C78A7DD996 /* Pods */,
+				B8D337A0628042828DEF81DD /* Frameworks */,
 			);
 			sourceTree = "<group>";
 		};
-		53CBA97A59CEA6607BD0701C /* Frameworks */ = {
+		796AF63A203DC5C78A7DD996 /* Pods */ = {
 			isa = PBXGroup;
 			children = (
-				57E452A1AEC988EF3DB6E197 /* Pods_IUIAutoExample.framework */,
-			);
-			name = Frameworks;
-			sourceTree = "<group>";
-		};
-		5902E51B14B702079F52B8C2 /* Pods */ = {
-			isa = PBXGroup;
-			children = (
-				3FC5FBC9C1523ED33704BA61 /* Pods-IUIAutoExample.debug.xcconfig */,
-				0DF54B682482738395FFBAA4 /* Pods-IUIAutoExample.release.xcconfig */,
+				1E8711A499511FF2BC13FEE7 /* Pods-IUIAutoExample.debug.xcconfig */,
+				59A6D9D266FC0B7BEFB8257B /* Pods-IUIAutoExample.release.xcconfig */,
 			);
 			name = Pods;
 			path = Pods;
+			sourceTree = "<group>";
+		};
+		B8D337A0628042828DEF81DD /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				3C51EFBA00E4F2DBF6690EEF /* Pods_IUIAutoExample.framework */,
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -94,9 +98,10 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 33FD507555EA453A1F0B8C12 /* Build configuration list for PBXNativeTarget "IUIAutoExample" */;
 			buildPhases = (
-				7E672FB4E0ADE00E89E0A075 /* [CP] Check Pods Manifest.lock */,
+				6B4525B1E803312C9E86BF34 /* [CP] Check Pods Manifest.lock */,
 				6BC3DA3904D912F24A770B7F /* Sources */,
-				3FAD965590D87842989681D7 /* Frameworks */,
+				A398E7B16AEF144C119CEACC /* Resources */,
+				6C1FCFE24F6E7C7778EC2128 /* Frameworks */,
 			);
 			buildRules = (
 			);
@@ -124,6 +129,7 @@
 			knownRegions = (
 				Base,
 				en,
+				"zh-Hans",
 			);
 			mainGroup = 481BD309440D8B59FC1CA2FA;
 			minimizedProjectReferenceProxies = 1;
@@ -137,8 +143,19 @@
 		};
 /* End PBXProject section */
 
+/* Begin PBXResourcesBuildPhase section */
+		A398E7B16AEF144C119CEACC /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				0D862395C138153316E81A81 /* Localizable.strings in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
 /* Begin PBXShellScriptBuildPhase section */
-		7E672FB4E0ADE00E89E0A075 /* [CP] Check Pods Manifest.lock */ = {
+		6B4525B1E803312C9E86BF34 /* [CP] Check Pods Manifest.lock */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -175,10 +192,22 @@
 		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXVariantGroup section */
+		ACDB979F9E1842C88FA416CD /* Localizable.strings */ = {
+			isa = PBXVariantGroup;
+			children = (
+				72D0FF80E62A6383AF98E54C /* en */,
+				2A3954BF88F3230E8708E0C0 /* zh-Hans */,
+			);
+			name = Localizable.strings;
+			sourceTree = "<group>";
+		};
+/* End PBXVariantGroup section */
+
 /* Begin XCBuildConfiguration section */
 		03913B26FA4B97F1956388C6 /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 0DF54B682482738395FFBAA4 /* Pods-IUIAutoExample.release.xcconfig */;
+			baseConfigurationReference = 59A6D9D266FC0B7BEFB8257B /* Pods-IUIAutoExample.release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
@@ -315,7 +344,7 @@
 		};
 		D24BEF584B98974D8A161CE7 /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 3FC5FBC9C1523ED33704BA61 /* Pods-IUIAutoExample.debug.xcconfig */;
+			baseConfigurationReference = 1E8711A499511FF2BC13FEE7 /* Pods-IUIAutoExample.debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";

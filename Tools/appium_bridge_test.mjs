@@ -171,6 +171,15 @@ function createFakeApp(deviceModel = 'arm64') {
         return { ok: true, data: { source: '<?xml version="1.0" encoding="UTF-8"?>\n<AppiumAUT><XCUIElementTypeButton name="btn.counter"/></AppiumAUT>' } };
       case 'screenshot':
         return { ok: true, data: { image: 'iVBORw0KGgoAAAANSUhEUg==', width: 402, height: 874 } };
+      case 'screenshot_compare': {
+        if (params.baseline === 'GOOD_BASELINE') {
+          return { ok: true, data: { pass: true, diffPercent: 0, matchedPixels: 100 } };
+        }
+        if (params.baseline === 'BAD_BASELINE') {
+          return { ok: false, error: '视觉差异 5.000% 超过阈值 1.00%', data: { pass: false, diffPercent: 5 } };
+        }
+        return { ok: false, error: '对比失败（截图或基线解码失败）' };
+      }
       case 'device_info':
         return { ok: true, data: {
           name: 'iPhone 17 Pro', systemVersion: '26.5', bundleId: 'com.iuiauto.example',
@@ -367,7 +376,16 @@ const FAKE_UDID = '11111111-2222-3333-4444-555555555555';
 function createFakeSimctl() {
   const calls = [];
   const container = mkdtempSync(join(tmpdir(), 'iua-simctl-test-'));
+  // 假 App 安装目录：带真实 Localizable.strings（plutil 真解析）
+  const appBundle = mkdtempSync(join(tmpdir(), 'iua-simctl-app-'));
+  mkdirSync(join(appBundle, 'zh-Hans.lproj'), { recursive: true });
+  mkdirSync(join(appBundle, 'en.lproj'), { recursive: true });
+  writeFileSync(join(appBundle, 'zh-Hans.lproj', 'Localizable.strings'),
+    '"demo.greeting" = "你好，IUIAuto";\n"demo.submit" = "提交";\n');
+  writeFileSync(join(appBundle, 'en.lproj', 'Localizable.strings'),
+    '"demo.greeting" = "Hello, IUIAuto";\n"demo.submit" = "Submit";\n');
   let running = new Set(['com.iuiauto.example']);
+  let appearance = 'dark';
   let videoStops = 0;
 
   const fakeRun = async (args) => {
@@ -377,6 +395,15 @@ function createFakeSimctl() {
       return JSON.stringify({ devices: { 'iOS 26.5': [
         { udid: FAKE_UDID, name: 'iPhone 17 Pro', state: 'Booted' },
       ] } });
+    }
+    if (sub === 'privacy') return '';
+    if (sub === 'get_app_container') return `${rest[2] === 'app' ? appBundle : container}\n`;
+    if (sub === 'ui') {
+      if (rest[1] === 'appearance') {
+        if (rest[2] === 'light' || rest[2] === 'dark') appearance = rest[2];
+        return `${appearance}\n`;
+      }
+      throw new Error('fake simctl 未实现的 ui 子命令: ' + args.join(' '));
     }
     if (sub === 'launch') {
       running.add(rest[1]);
@@ -803,12 +830,272 @@ test('mobile: installApp / removeApp / isAppInstalled / pushFile / queryAppState
   assert.equal(r.json.value, 1);
 });
 
+test('simctl: mobile setAppearance / getAppearance', async () => {
+  let r = await request('POST', `/session/${sessionId}/execute/sync`, { script: 'mobile: getAppearance', args: [] });
+  assert.equal(r.status, 200);
+  assert.equal(r.json.value.style, 'dark');
+  r = await request('POST', `/session/${sessionId}/execute/sync`, { script: 'mobile: setAppearance', args: [{ style: 'light' }] });
+  assert.equal(r.status, 200);
+  assert.equal(r.json.value.style, 'light');
+  assert.ok(simctlFake.calls.includes(`ui ${FAKE_UDID} appearance light`));
+  r = await request('POST', `/session/${sessionId}/execute/sync`, { script: 'mobile: setAppearance', args: [{ style: 'blue' }] });
+  assert.equal(r.status, 400);
+  assert.equal(r.json.value.error, 'invalid argument');
+});
+
+test('mobile: hideKeyboard / keys', async () => {
+  let r = await request('POST', `/session/${sessionId}/execute/sync`, {
+    script: 'mobile: hideKeyboard', args: [{ key: 'return' }],
+  });
+  assert.equal(r.status, 200);
+  const lastKey = [...fake.state.calls].reverse().find((c) => c.action === 'press_key');
+  assert.equal(lastKey.params.key, 'return');
+  r = await request('POST', `/session/${sessionId}/execute/sync`, { script: 'mobile: hideKeyboard', args: [] });
+  assert.equal(r.status, 200);
+  assert.ok([...fake.state.calls].some((c) => c.action === 'dismiss_keyboard'));
+  const keysBefore = fake.state.calls.filter((c) => c.action === 'press_key').length;
+  r = await request('POST', `/session/${sessionId}/execute/sync`, {
+    script: 'mobile: keys', args: [{ keys: ['ab', '\uE003'] }],
+  });
+  assert.equal(r.status, 200);
+  const keys = fake.state.calls.filter((c) => c.action === 'press_key').slice(keysBefore)
+    .map((c) => c.params.key);
+  assert.deepEqual(keys, ['a', 'b', 'delete']);
+});
+
+test('JSON Wire: element location / location_in_view / size / equals', async () => {
+  let r = await request('GET', `/session/${sessionId}/element/${buttonId}/location`);
+  assert.deepEqual(r.json.value, { x: 10, y: 20 });
+  r = await request('GET', `/session/${sessionId}/element/${buttonId}/location_in_view`);
+  assert.deepEqual(r.json.value, { x: 10, y: 20 });
+  r = await request('GET', `/session/${sessionId}/element/${buttonId}/size`);
+  assert.deepEqual(r.json.value, { width: 100, height: 40 });
+  // 重新查找同一元素 → equals true；不同元素 → false
+  const again = await request('POST', `/session/${sessionId}/element`, { using: 'accessibility id', value: 'btn.counter' });
+  const againId = again.json.value[ELEMENT_KEY];
+  r = await request('GET', `/session/${sessionId}/element/${buttonId}/equals/${againId}`);
+  assert.equal(r.json.value, true);
+  r = await request('GET', `/session/${sessionId}/element/${buttonId}/equals/${labelId}`);
+  assert.equal(r.json.value, false);
+});
+
+test('JSON Wire: POST /keys sends key sequence', async () => {
+  const keysBefore = fake.state.calls.filter((c) => c.action === 'press_key').length;
+  const r = await request('POST', `/session/${sessionId}/keys`, { value: ['hi', '\uE007'] });
+  assert.equal(r.status, 200);
+  const keys = fake.state.calls.filter((c) => c.action === 'press_key').slice(keysBefore)
+    .map((c) => c.params.key);
+  assert.deepEqual(keys, ['h', 'i', 'return']);
+});
+
+test('JSON Wire: touch/perform chains', async () => {
+  // tap 链
+  let r = await request('POST', `/session/${sessionId}/touch/perform`, {
+    actions: [{ action: 'tap', options: { x: 120, y: 240 } }],
+  });
+  assert.equal(r.status, 200);
+  assert.equal(fake.state.lastGesture.action, 'tap');
+  assert.equal(fake.state.lastGesture.x, 120);
+  // press → wait → moveTo → release ⇒ swipe
+  r = await request('POST', `/session/${sessionId}/touch/perform`, {
+    actions: [
+      { action: 'press', options: { x: 200, y: 600 } },
+      { action: 'wait', options: { ms: 100 } },
+      { action: 'moveTo', options: { x: 200, y: 300 } },
+      { action: 'release' },
+    ],
+  });
+  assert.equal(r.status, 200);
+  assert.equal(fake.state.lastGesture.action, 'swipe');
+  assert.equal(fake.state.lastGesture.fromY, 600);
+  assert.equal(fake.state.lastGesture.toY, 300);
+  // longPress 链：元素相对坐标（rect 10,20,100,40 + 偏移 5,6 → 15,26）
+  r = await request('POST', `/session/${sessionId}/touch/perform`, {
+    actions: [{ action: 'longPress', options: { element: { ELEMENT: buttonId }, x: 5, y: 6 } }],
+  });
+  assert.equal(r.status, 200);
+  assert.equal(fake.state.lastGesture.action, 'long_press');
+  assert.equal(fake.state.lastGesture.x, 15);
+  assert.equal(fake.state.lastGesture.y, 26);
+  // 未知动作 → 400
+  r = await request('POST', `/session/${sessionId}/touch/perform`, {
+    actions: [{ action: 'explode' }],
+  });
+  assert.equal(r.status, 400);
+});
+
+test('JSON Wire: touch/multi/perform → pinch', async () => {
+  const r = await request('POST', `/session/${sessionId}/touch/multi/perform`, {
+    actions: [
+      [
+        { action: 'press', options: { x: 150, y: 300 } },
+        { action: 'moveTo', options: { x: 100, y: 300 } },
+        { action: 'release' },
+      ],
+      [
+        { action: 'press', options: { x: 250, y: 300 } },
+        { action: 'moveTo', options: { x: 300, y: 300 } },
+        { action: 'release' },
+      ],
+    ],
+  });
+  assert.equal(r.status, 200);
+  assert.equal(fake.state.lastGesture.action, 'pinch');
+  assert.equal(fake.state.lastGesture.radiusFrom, 50);
+  assert.equal(fake.state.lastGesture.radiusTo, 100);
+});
+
+test('appium settings: screenshotQuality applies to screenshots', async () => {
+  let r = await request('POST', `/session/${sessionId}/appium/settings`, { settings: { screenshotQuality: 0 } });
+  assert.equal(r.status, 200);
+  assert.equal((await request('GET', `/session/${sessionId}/appium/settings`)).json.value.screenshotQuality, 0);
+  r = await request('GET', `/session/${sessionId}/screenshot`);
+  assert.equal(r.status, 200);
+  const lastShot = [...fake.state.calls].reverse().find((c) => c.action === 'screenshot');
+  assert.equal(lastShot.params.quality, 0);
+  // 元素截图同样生效
+  await request('GET', `/session/${sessionId}/element/${buttonId}/screenshot`);
+  const lastElementShot = [...fake.state.calls].reverse()
+    .find((c) => c.action === 'element_action' && c.params.action === 'screenshot');
+  assert.equal(lastElementShot.params.quality, 0);
+  // 恢复默认
+  await request('POST', `/session/${sessionId}/appium/settings`, { settings: { screenshotQuality: 2 } });
+});
+
+test('mobile: scroll XCUITest semantics (name / predicateString / direction)', async () => {
+  // name：找到即返回元素句柄，并滚到可见
+  let r = await request('POST', `/session/${sessionId}/execute/sync`, {
+    script: 'mobile: scroll', args: [{ name: 'field.input' }],
+  });
+  assert.equal(r.status, 200);
+  assert.ok(r.json.value[ELEMENT_KEY], '应返回目标元素句柄');
+  assert.ok(fake.state.calls.some((c) => c.action === 'element_action' && c.params.action === 'scroll_to'));
+  // 找不到 → 循环滚动后 404
+  await request('POST', `/session/${sessionId}/timeouts`, { script: 3000 });
+  r = await request('POST', `/session/${sessionId}/execute/sync`, {
+    script: 'mobile: scroll', args: [{ predicateString: 'name == "never.found"' }],
+  });
+  assert.equal(r.status, 404);
+  assert.equal(r.json.value.error, 'no such element');
+  assert.equal(fake.state.lastGesture.action, 'swipe', '循环过程中应产生滚动');
+  // 普通 direction+distance 滚动不受影响
+  r = await request('POST', `/session/${sessionId}/execute/sync`, {
+    script: 'mobile: scroll', args: [{ direction: 'down', distance: 200 }],
+  });
+  assert.equal(r.status, 200);
+  assert.equal(fake.state.lastGesture.action, 'swipe');
+});
+
+test('mobile: compareImages maps screenshot_compare', async () => {
+  let r = await request('POST', `/session/${sessionId}/execute/sync`, {
+    script: 'mobile: compareImages', args: [{ firstImage: 'GOOD_BASELINE' }],
+  });
+  assert.equal(r.status, 200);
+  assert.equal(r.json.value.pass, true);
+  assert.equal(r.json.value.diffPercent, 0);
+  const goodCall = fake.state.calls.find((c) => c.action === 'screenshot_compare' && c.params.baseline === 'GOOD_BASELINE');
+  assert.ok(goodCall);
+  assert.equal(goodCall.params.thresholdPercent, undefined, '未给阈值不应传 thresholdPercent');
+  // 差异超阈值 → pass:false 结构化返回（而不是抛错）
+  r = await request('POST', `/session/${sessionId}/execute/sync`, {
+    script: 'mobile: compareImages', args: [{ firstImage: 'BAD_BASELINE', options: { threshold: 1 } }],
+  });
+  assert.equal(r.status, 200);
+  assert.equal(r.json.value.pass, false);
+  assert.equal(r.json.value.diffPercent, 5);
+  const badCall = fake.state.calls.find((c) => c.action === 'screenshot_compare' && c.params.baseline === 'BAD_BASELINE');
+  assert.equal(badCall.params.thresholdPercent, 1);
+  // Appium 风格 0~1 阈值 → 换算为百分比
+  await request('POST', `/session/${sessionId}/execute/sync`, {
+    script: 'mobile: compareImages', args: [{ firstImage: 'GOOD_BASELINE', options: { threshold: 0.02 } }],
+  });
+  const scaled = [...fake.state.calls].reverse().find((c) => c.action === 'screenshot_compare');
+  assert.equal(scaled.params.thresholdPercent, 2);
+  // 缺参 → 400
+  r = await request('POST', `/session/${sessionId}/execute/sync`, { script: 'mobile: compareImages', args: [{}] });
+  assert.equal(r.status, 400);
+});
+
+test('Appium events endpoints', async () => {
+  let r = await request('GET', `/session/${sessionId}/appium/events`);
+  assert.ok(r.json.value.events.sessionStarted.length >= 1);
+  assert.ok(r.json.value.events.serverStarted.length >= 1);
+  // POST 按名称过滤
+  r = await request('POST', `/session/${sessionId}/appium/events`, { events: ['sessionStarted'] });
+  assert.deepEqual(Object.keys(r.json.value.events), ['sessionStarted']);
+  // 服务器级 /events
+  r = await request('GET', '/events');
+  assert.ok(r.json.value.events.sessionRequested.length >= 1);
+});
+
+test('mobile: setPermission / resetPermission (simctl privacy)', async () => {
+  // 当前 App grant：等重连（假 hello 恒在线，最多 2s 后继续）
+  let r = await request('POST', `/session/${sessionId}/execute/sync`, {
+    script: 'mobile: setPermission', args: [{ service: 'photos', state: 'granted' }],
+  });
+  assert.equal(r.status, 200);
+  assert.ok(simctlFake.calls.includes(`privacy ${FAKE_UDID} grant photos com.iuiauto.example`));
+  // 其他 App deny / reset：不等待重连
+  r = await request('POST', `/session/${sessionId}/execute/sync`, {
+    script: 'mobile: setPermission', args: [{ service: 'location', state: 'denied', bundleId: 'com.other.app' }],
+  });
+  assert.equal(r.status, 200);
+  assert.ok(simctlFake.calls.includes(`privacy ${FAKE_UDID} revoke location com.other.app`));
+  r = await request('POST', `/session/${sessionId}/execute/sync`, {
+    script: 'mobile: setPermission', args: [{ service: 'photos', state: 'reset', bundleId: 'com.other.app' }],
+  });
+  assert.ok(simctlFake.calls.includes(`privacy ${FAKE_UDID} reset photos com.other.app`));
+  r = await request('POST', `/session/${sessionId}/execute/sync`, {
+    script: 'mobile: resetPermission', args: [{ service: 'all', bundleId: 'com.other.app' }],
+  });
+  assert.equal(r.status, 200);
+  assert.ok(simctlFake.calls.includes(`privacy ${FAKE_UDID} reset all com.other.app`));
+  // 非法服务（camera 不在本机 simctl 服务表）→ 400；非法状态 → 400
+  r = await request('POST', `/session/${sessionId}/execute/sync`, {
+    script: 'mobile: setPermission', args: [{ service: 'camera', state: 'granted', bundleId: 'com.other.app' }],
+  });
+  assert.equal(r.status, 400);
+  r = await request('POST', `/session/${sessionId}/execute/sync`, {
+    script: 'mobile: setPermission', args: [{ service: 'photos', state: 'maybe', bundleId: 'com.other.app' }],
+  });
+  assert.equal(r.status, 400);
+});
+
+test('mobile: getAppStrings reads bundle Localizable.strings', async () => {
+  let r = await request('POST', `/session/${sessionId}/execute/sync`, {
+    script: 'mobile: getAppStrings', args: [{ language: 'zh-Hans' }],
+  });
+  assert.equal(r.status, 200);
+  assert.equal(r.json.value.language, 'zh-Hans');
+  assert.equal(r.json.value.strings['demo.greeting'], '你好，IUIAuto');
+  r = await request('POST', `/session/${sessionId}/execute/sync`, {
+    script: 'mobile: getAppStrings', args: [{ language: 'en' }],
+  });
+  assert.equal(r.json.value.strings['demo.greeting'], 'Hello, IUIAuto');
+  // 未知语言回退 en/Base
+  r = await request('POST', `/session/${sessionId}/execute/sync`, {
+    script: 'mobile: getAppStrings', args: [{ language: 'fr' }],
+  });
+  assert.equal(r.status, 200);
+  assert.equal(r.json.value.strings['demo.greeting'], 'Hello, IUIAuto');
+});
+
+test('mobile: getClipboard / setClipboard aliases', async () => {
+  let r = await request('POST', `/session/${sessionId}/execute/sync`, {
+    script: 'mobile: setClipboard', args: [{ content: '剪贴板别名' }],
+  });
+  assert.equal(r.status, 200);
+  r = await request('POST', `/session/${sessionId}/execute/sync`, { script: 'mobile: getClipboard', args: [] });
+  assert.equal(r.status, 200);
+  assert.equal(r.json.value, '剪贴板别名');
+});
+
 test('real device: host-side management returns unsupported', async () => {
   const realFake = createFakeApp('iPhone17,1');
   const realHello = {
     type: 'hello',
     agent: 'IUIAuto',
-    version: '0.4.0',
+    version: '0.5.0',
     environment: { systemVersion: '26.5', deviceModel: 'iPhone17,1' },
     actions: [],
   };
@@ -830,13 +1117,29 @@ test('real device: host-side management returns unsupported', async () => {
     });
     return { status: response.status, json: await response.json() };
   };
+  // appium:orientation capability：建会话即设置方向
+  // appium:newCommandTimeout=3：空闲后自动结束会话
   const created = await post('/session', {
-    capabilities: { alwaysMatch: { platformName: 'iOS', 'appium:automationName': 'IUIAuto' } },
+    capabilities: { alwaysMatch: {
+      platformName: 'iOS',
+      'appium:automationName': 'IUIAuto',
+      'appium:orientation': 'LANDSCAPE',
+      'appium:newCommandTimeout': 3,
+    } },
   });
   const sid = created.json.value.sessionId;
+  assert.equal(realFake.state.orientation, 'LANDSCAPE');
   const simctlCallsBefore = simctlFake.calls.length;
 
   let r = await post(`/session/${sid}/appium/device/terminate_app`, { appId: 'com.any.app' });
+  assert.equal(r.status, 500);
+  assert.equal(r.json.value.error, 'unsupported operation');
+  r = await post(`/session/${sid}/execute/sync`, { script: 'mobile: setAppearance', args: [{ style: 'dark' }] });
+  assert.equal(r.status, 500);
+  assert.equal(r.json.value.error, 'unsupported operation');
+  r = await post(`/session/${sid}/execute/sync`, {
+    script: 'mobile: setPermission', args: [{ service: 'photos', state: 'granted' }],
+  });
   assert.equal(r.status, 500);
   assert.equal(r.json.value.error, 'unsupported operation');
   // 真机激活"当前 App"仍可用（App 本就在前台）
@@ -849,7 +1152,22 @@ test('real device: host-side management returns unsupported', async () => {
   assert.equal(r.json.value, 0);
   assert.equal(simctlFake.calls.length, simctlCallsBefore);
 
-  await fetch(`${realBase}/session/${sid}`, { method: 'DELETE' });
+  // appium:newCommandTimeout=3：不再发命令后，会话应自动结束（用根路径轮询，不刷新计时）
+  const expired = await (async () => {
+    const deadline = Date.now() + 15000;
+    while (Date.now() < deadline) {
+      const status = await fetch(`${realBase}/`).then((x) => x.json()).catch(() => null);
+      if (status && status.value.session === null) return true;
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+    return false;
+  })();
+  assert.equal(expired, true, '会话应在 newCommandTimeout 空闲后自动结束');
+  const gone = await fetch(`${realBase}/session/${sid}/source`).then((x) => x.status);
+  assert.equal(gone, 404);
+  const events = await fetch(`${realBase}/events`).then((x) => x.json());
+  assert.ok(events.value.events.unexpectedShutdown?.length >= 1, '应记录 unexpectedShutdown 事件');
+
   await realBridge.close();
 });
 
@@ -904,6 +1222,24 @@ test('DELETE /session stops active recording', async () => {
   const after = await request('GET', `/session/${sessionId}/source`);
   assert.equal(after.status, 404);
   assert.equal(after.json.value.error, 'invalid session id');
+});
+
+test('POST /session with appium:forceAppLaunch restarts host app', async () => {
+  const r = await request('POST', '/session', {
+    capabilities: { alwaysMatch: {
+      platformName: 'iOS',
+      'appium:automationName': 'IUIAuto',
+      'appium:forceAppLaunch': true,
+    } },
+  });
+  assert.equal(r.status, 200);
+  assert.ok(r.json.value.sessionId);
+  assert.ok(simctlFake.calls.includes(`terminate ${FAKE_UDID} com.iuiauto.example`));
+  assert.ok(simctlFake.calls.includes(`launch ${FAKE_UDID} com.iuiauto.example`));
+  // 事件流包含两次会话创建
+  const events = await request('GET', '/events');
+  assert.ok(events.json.value.events.sessionRequested.length >= 2);
+  assert.ok(events.json.value.events.sessionStarted.length >= 2);
 });
 
 // ---------------------------------------------------------------------------
