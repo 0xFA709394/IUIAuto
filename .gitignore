@@ -1,0 +1,21 @@
+# ---- macOS ----
+.DS_Store
+._*
+
+# ---- Node（Tools 控制台 / Appium 桥；package-lock.json 需保留跟踪）----
+node_modules/
+npm-debug.log*
+
+# ---- Xcode / CocoaPods ----
+DerivedData/
+xcuserdata/
+*.xcuserstate
+*.xcscmblueprint
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# ---- 测试运行产物（截图 / 录制轨迹；baselines/ 基线数据保留跟踪）----
+Tools/shot.png
+Tools/fail.png
+Tools/traces/
