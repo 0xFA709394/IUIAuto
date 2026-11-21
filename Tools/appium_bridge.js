@@ -43,7 +43,7 @@ import { createSimctl, looksLikeSimulatorModel } from './iua_simctl.js';
 const DEFAULT_BRIDGE_PORT = +(process.env.BRIDGE_PORT || 4723);
 const DEFAULT_APP_PORT = +(process.env.APP_PORT || 9800);
 const DEFAULT_BRIDGE_HOST = process.env.BRIDGE_HOST || '127.0.0.1';
-const AGENT_VERSION = '0.7.0';
+const AGENT_VERSION = '0.8.0';
 
 const SUPPORTED_LOCATORS = new Set([
   'accessibility id', 'id', 'identifier', 'name', 'label', 'text',
@@ -517,6 +517,15 @@ export function createAppiumBridge(options = {}) {
         const value = await simctlCall(simctlModule.getAppearance(udid));
         return { style: value };
       }
+      case 'setReduceTransparency': {
+        const udid = await requireSimulatorUdid(currentSession);
+        const value = await simctlCall(simctlModule.setReduceTransparency(udid, options.enabled !== false));
+        return value;
+      }
+      case 'getReduceTransparency': {
+        const udid = await requireSimulatorUdid(currentSession);
+        return simctlCall(simctlModule.getReduceTransparency(udid));
+      }
       case 'setPermission': {
         // Appium 语义：state = granted/allow | denied/deny | reset/unset
         const bundleId = String(options.bundleId || currentBundleId);
@@ -945,6 +954,12 @@ export function createAppiumBridge(options = {}) {
       const data = await elementOp(record, 'get_rect');
       return sendJSON(res, { value: { width: number(data?.width), height: number(data?.height) } });
     }
+    if (method === 'GET' && (key === 'computedlabel' || key === 'computedrole')) {
+      // W3C ARIA 兼容：computedlabel → 可访问标签；computedrole → 元素类型
+      const attribute = key === 'computedlabel' ? 'label' : 'type';
+      const data = await elementOp(record, 'get_attribute', { attribute });
+      return sendJSON(res, { value: attributeValue(data?.value) });
+    }
     if (method === 'GET' && (key === 'attribute' || key === 'property')) {
       const name = op.slice(1).join('/');
       if (!name) throw wdError('invalid argument', '缺少属性名', 400);
@@ -1058,7 +1073,8 @@ export function createAppiumBridge(options = {}) {
         }, 20);
       };
 
-      const deadline = Date.now() + Math.min(Math.max(currentSession.scriptTimeout, 3000), 60000);
+      // 上限 25s：在常见客户端 30s 中止之前返回干净的 no such element
+      const deadline = Date.now() + Math.min(Math.max(currentSession.scriptTimeout, 3000), 25000);
       while (Date.now() < deadline) {
         if (toVisibleId) {
           try {
@@ -1304,6 +1320,12 @@ export function createAppiumBridge(options = {}) {
       }
       case 'getappearance': {
         return appManagement(currentSession, 'getAppearance', options);
+      }
+      case 'setreducetransparency': {
+        return appManagement(currentSession, 'setReduceTransparency', options);
+      }
+      case 'getreducetransparency': {
+        return appManagement(currentSession, 'getReduceTransparency', options);
       }
       case 'orientation': {
         const data = await appSend('orientation');

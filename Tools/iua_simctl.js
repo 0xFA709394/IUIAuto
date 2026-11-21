@@ -155,6 +155,20 @@ export function createSimctl({ run = defaultRun, spawnVideo = defaultSpawnVideo,
     return getAppearance(udid);
   }
 
+  // ---- 降低透明度（Appium mobile: setReduceTransparency / getReduceTransparency）----
+
+  async function getReduceTransparency(udid) {
+    const stdout = String(await simctl(['ui', udid, 'increase_contrast'], 20)).trim().toLowerCase();
+    if (stdout === 'enabled' || stdout === 'disabled') return stdout === 'enabled';
+    throw fail('device', `模拟器不支持降低透明度读取/设置: ${stdout || '无输出'}`);
+  }
+
+  async function setReduceTransparency(udid, enabled) {
+    const value = enabled ? 'enabled' : 'disabled';
+    await simctl(['ui', udid, 'increase_contrast', value], 20);
+    return getReduceTransparency(udid);
+  }
+
   // ---- 权限（Appium mobile: setPermission / resetPermission，服务名与 simctl/XCUITest 一致）----
 
   const PRIVACY_SERVICES = new Set([
@@ -373,6 +387,8 @@ export function createSimctl({ run = defaultRun, spawnVideo = defaultSpawnVideo,
     appState,
     getAppearance,
     setAppearance,
+    getReduceTransparency,
+    setReduceTransparency,
     grantService,
     revokeService,
     resetService,

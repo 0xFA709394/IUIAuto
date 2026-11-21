@@ -4,7 +4,7 @@
 # make gui     启动 GUI 控制台（自动开浏览器）
 # make demo    CLI 全链路自动演示（12 项断言）
 # make test    端到端验证：demo + 录制回放 + CLI + Appium 桥单测
-# make test-appium  Appium 桥 + 模拟器真实 E2E
+# make test-appium  Appium 桥 + 模拟器真实 E2E + WebdriverIO 真实客户端
 # make clean   清理构建产物
 
 .PHONY: setup build gui demo test test-appium clean
@@ -28,7 +28,7 @@ test:
 	 node run_script.js --takeover /tmp/mk_check.txt && node dsl_regression_test.mjs && node appium_bridge_test.mjs
 
 test-appium:
-	@cd Tools && node dsl_regression_test.mjs && node appium_bridge_test.mjs && node appium_e2e_test.mjs
+	@cd Tools && node dsl_regression_test.mjs && node appium_bridge_test.mjs && node appium_e2e_test.mjs && node appium_client_test.mjs
 
 clean:
 	@rm -rf ~/Library/Developer/Xcode/DerivedData/IUIAuto-* Tools/shot.png Tools/fail.png

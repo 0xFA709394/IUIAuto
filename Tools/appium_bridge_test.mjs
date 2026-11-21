@@ -152,10 +152,11 @@ function createFakeApp(deviceModel = 'arm64') {
           return { ok: true, data: { x: 10, y: 20, width: 100, height: 40 } };
         }
         if (elementAction === 'get_attribute') {
-          const isLabel = String(params.value || '').includes('label.counter');
-          const value = attribute === 'value' ? state.text
-            : attribute === 'name' ? (isLabel ? 'label.counter' : 'btn.counter')
-            : attribute === 'label' ? `Count: ${state.counter}`
+          const element = elementsFor(params.value)[0] || element();
+          const value = attribute === 'value' ? (element.value ?? '')
+            : attribute === 'name' ? element.name
+            : attribute === 'label' ? element.label
+            : attribute === 'type' ? element.type
             : null;
           if (value === null) return { ok: false, error: 'unknown attribute: ' + attribute };
           return { ok: true, data: { attribute, value } };
@@ -386,6 +387,7 @@ function createFakeSimctl() {
     '"demo.greeting" = "Hello, IUIAuto";\n"demo.submit" = "Submit";\n');
   let running = new Set(['com.iuiauto.example']);
   let appearance = 'dark';
+  let increaseContrast = 'disabled';
   let videoStops = 0;
 
   const fakeRun = async (args) => {
@@ -402,6 +404,10 @@ function createFakeSimctl() {
       if (rest[1] === 'appearance') {
         if (rest[2] === 'light' || rest[2] === 'dark') appearance = rest[2];
         return `${appearance}\n`;
+      }
+      if (rest[1] === 'increase_contrast') {
+        if (rest[2] === 'enabled' || rest[2] === 'disabled') increaseContrast = rest[2];
+        return `${increaseContrast}\n`;
       }
       throw new Error('fake simctl 未实现的 ui 子命令: ' + args.join(' '));
     }
@@ -1059,6 +1065,30 @@ test('mobile: setPermission / resetPermission (simctl privacy)', async () => {
     script: 'mobile: setPermission', args: [{ service: 'photos', state: 'maybe', bundleId: 'com.other.app' }],
   });
   assert.equal(r.status, 400);
+});
+
+test('mobile: setReduceTransparency / getReduceTransparency', async () => {
+  let r = await request('POST', `/session/${sessionId}/execute/sync`, {
+    script: 'mobile: setReduceTransparency', args: [{ enabled: true }],
+  });
+  assert.equal(r.status, 200);
+  assert.equal(r.json.value, true);
+  assert.ok(simctlFake.calls.includes(`ui ${FAKE_UDID} increase_contrast enabled`));
+  r = await request('POST', `/session/${sessionId}/execute/sync`, { script: 'mobile: getReduceTransparency', args: [] });
+  assert.equal(r.json.value, true);
+  r = await request('POST', `/session/${sessionId}/execute/sync`, {
+    script: 'mobile: setReduceTransparency', args: [{ enabled: false }],
+  });
+  assert.equal(r.json.value, false);
+});
+
+test('W3C computedlabel / computedrole element endpoints', async () => {
+  let r = await request('GET', `/session/${sessionId}/element/${buttonId}/computedlabel`);
+  assert.equal(r.status, 200);
+  assert.equal(r.json.value, '点我');
+  r = await request('GET', `/session/${sessionId}/element/${buttonId}/computedrole`);
+  assert.equal(r.status, 200);
+  assert.equal(r.json.value, 'XCUIElementTypeButton');
 });
 
 test('mobile: getAppStrings reads bundle Localizable.strings', async () => {

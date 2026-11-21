@@ -6,9 +6,11 @@
 > HTTP 侧说 **W3C WebDriver / Appium 协议**，底层翻译为 IUIAuto App 的 WebSocket JSON 指令。
 > iOS 端仍然**不依赖 XCUITest / WebDriverAgent**，操作在宿主 App 进程内完成。
 >
-> 已用 **WebdriverIO 10.2.0** 真实客户端验证：建会话 / `~` 定位 / click / setValue /
+> 已用 **WebdriverIO 真实客户端**验证：建会话 / `~` 定位 / click / setValue /
 > getPageSource / takeScreenshot / performActions / getAlertText / sendAlertText / acceptAlert /
 > queryAppState / isAppInstalled / getActiveElement / 链式子元素 / deleteSession 全部通过。
+> 真实客户端回归脚本：`Tools/appium_client_test.mjs`（`make test-appium` 自动执行，
+> 覆盖元素链式操作 / W3C Actions 链式手势 / `mobile:` executeScript 命令族）。
 
 ---
 
@@ -182,6 +184,7 @@ curl -s -X POST http://127.0.0.1:4723/session/<SID>/element \
 | GET | `/session/:id/element/:eid/location` / `location_in_view` | 左上角坐标（JSON Wire 兼容） |
 | GET | `/session/:id/element/:eid/size` | 尺寸（JSON Wire 兼容） |
 | GET | `/session/:id/element/:eid/equals/:other` | 两句柄是否同一元素（JSON Wire 兼容） |
+| GET | `/session/:id/element/:eid/computedlabel` / `computedrole` | W3C ARIA 兼容（label / 元素类型） |
 
 ### 页面 / 手势 / 会话配置
 
@@ -282,6 +285,7 @@ curl -s -X POST http://127.0.0.1:4723/session/<SID>/element \
 | `mobile: pushFile` / `pullFile` / `pullFolder` | `path`、`payload|data` |
 | `mobile: startRecordingScreen` / `stopRecordingScreen` | —（停止返回 base64 mp4） |
 | `mobile: setAppearance` / `getAppearance` | `style: light/dark`（宿主 simctl，仅模拟器） |
+| `mobile: setReduceTransparency` / `getReduceTransparency` | `enabled: bool`（宿主 simctl `ui increase_contrast`，仅模拟器） |
 | `mobile: compareImages` | `firstImage`（基线 PNG base64）、`options.threshold`（0~1 相似度阈值自动换算为差异百分比，>=1 视为百分比）；返回 `{pass, diffPercent, …}`（App images 插件同名命令） |
 | `mobile: hideKeyboard` | `key?`（给 key 时用按键收起，如 `return`） |
 | `mobile: keys` | `keys: [...]`（逐键输入，支持 `\uE00x` 特殊键） |

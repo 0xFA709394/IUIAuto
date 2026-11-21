@@ -81,6 +81,7 @@ async function main() {
   let childLog = '';
   child.stdout.on('data', (data) => { childLog += data.toString(); });
   child.stderr.on('data', (data) => { childLog += data.toString(); });
+  let aborted = false;
 
   try {
     await waitFor('WebDriver 桥启动', async () => {
@@ -386,6 +387,7 @@ async function main() {
     check('删除会话', removed.status === 200);
   } catch (error) {
     // finally 里的 process.exit 会吞掉未处理的 rejection，必须在此打印失败原因
+    aborted = true;
     console.error('E2E 失败:', error.stack || error.message);
   } finally {
     if (!keep) {
@@ -399,12 +401,13 @@ async function main() {
       if (child.exitCode === null) child.kill('SIGKILL');
     }
     const passed = checks.filter((c) => c.pass).length;
-    console.log(`\n结果: ${passed}/${checks.length} 通过 ${passed === checks.length ? '✅ PASS' : '❌ FAIL'}`);
-    if (passed !== checks.length) {
+    const allPassed = !aborted && checks.length > 0 && passed === checks.length;
+    console.log(`\n结果: ${passed}/${checks.length} 通过${aborted ? '（异常中断）' : ''} ${allPassed ? '✅ PASS' : '❌ FAIL'}`);
+    if (!allPassed) {
       console.log('\n—— bridge 日志（末 60 行）——');
       console.log(childLog.split('\n').slice(-60).join('\n'));
     }
-    process.exit(passed === checks.length ? 0 : 1);
+    process.exit(allPassed ? 0 : 1);
   }
 }
 
